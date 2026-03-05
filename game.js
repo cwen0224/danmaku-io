@@ -508,7 +508,11 @@ function updateActiveSlash(dt) {
   }
 
   const runtime = state.weaponRuntime;
-  const duration = Math.min(CONFIG.slash.swingDurationSec, runtime.cooldown * 0.6);
+  const mode = ATTACK_MODES[state.attackModeIndex];
+  const cleaveArc = (Math.PI * 2) / 3;
+  const baseDuration = Math.min(CONFIG.slash.swingDurationSec, runtime.cooldown * 0.6);
+  const arcDurationScale = mode.id === "breaker" ? runtime.arc / cleaveArc : 1;
+  const duration = clamp(baseDuration * arcDurationScale, 0.08, runtime.cooldown * 0.95);
   const slash = state.activeSlash;
   const nextProgress = clamp(slash.progress + dt / duration, 0, 1);
 
