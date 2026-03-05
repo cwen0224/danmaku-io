@@ -6,10 +6,12 @@ const killsEl = document.getElementById("kills");
 const timeEl = document.getElementById("time");
 const weaponEl = document.getElementById("weapon");
 const slashModeEl = document.getElementById("slash-mode");
+const versionBadgeEl = document.getElementById("version-badge");
 const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
+const APP_VERSION = "20260305140750";
 
 const WEAPON_PRESETS = [
   {
@@ -894,6 +896,9 @@ canvas.addEventListener("contextmenu", (event) => {
 
 window.addEventListener("resize", resizeCanvas);
 restartBtn.addEventListener("click", reset);
+if (versionBadgeEl) {
+  versionBadgeEl.textContent = `v${APP_VERSION}`;
+}
 
 reset();
 requestAnimationFrame(tick);

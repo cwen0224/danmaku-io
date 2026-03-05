@@ -32,6 +32,22 @@ body {
   gap: 10px;
 }
 
+.version-badge {
+  position: fixed;
+  top: 10px;
+  right: 12px;
+  z-index: 20;
+  font-size: 12px;
+  line-height: 1;
+  color: #c6d8ff;
+  background: rgba(10, 18, 32, 0.78);
+  border: 1px solid #3c4f75;
+  border-radius: 999px;
+  padding: 6px 10px;
+  letter-spacing: 0.5px;
+  user-select: text;
+}
+
 .hud {
   display: flex;
   gap: 16px;
