@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305150809";
+const APP_VERSION = "20260305151130";
 
 const WEAPON_PRESETS = [
   {
@@ -61,8 +61,8 @@ const ATTACK_MODES = [
     arcMult: 1.0,
     cooldownMult: 1.12,
     damageMult: 1.12,
-    knockbackMult: 9,
-    impulseMult: 9
+    knockbackMult: 2.25,
+    impulseMult: 2.25
   },
   {
     id: "thrust",
@@ -71,8 +71,8 @@ const ATTACK_MODES = [
     arcMult: 0.36,
     cooldownMult: 0.62,
     damageMult: 1.34,
-    knockbackMult: 16,
-    impulseMult: 16
+    knockbackMult: 4,
+    impulseMult: 4
   },
   {
     id: "breaker",
@@ -82,8 +82,8 @@ const ATTACK_MODES = [
     arcMult: 1.42,
     cooldownMult: 1.9,
     damageMult: 0.78,
-    knockbackMult: 4,
-    impulseMult: 4
+    knockbackMult: 1,
+    impulseMult: 1
   }
 ];
 
@@ -1179,6 +1179,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
