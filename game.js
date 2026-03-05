@@ -23,6 +23,7 @@ const CONFIG = {
     baseArc: Math.PI * 0.5,
     headHitThreshold: 0.68,
     visualKnockbackScale: 0.065,
+    knockbackImpulseScale: 7.2,
     hitboxRadius: 16,
     swingDurationSec: 0.12
   },
@@ -30,7 +31,9 @@ const CONFIG = {
     spawnSec: 0.72,
     minSpawnSec: 0.2,
     accelPerMin: 0.24,
-    edgePadding: 30
+    edgePadding: 30,
+    knockbackDrag: 8.5,
+    stunSlowRatio: 0.18
   },
   weapon: {
     name: "訓練長戟",
@@ -45,7 +48,7 @@ const CONFIG = {
     bleedChanceBase: 0.16,
     bleedDpsBase: 7,
     bleedDuration: 2.6,
-    baseStunSec: 0.14
+    baseStunSec: 0.1
   }
 };
 
@@ -195,6 +198,8 @@ function spawnEnemy() {
   state.enemies.push({
     x,
     y,
+    vx: 0,
+    vy: 0,
     radius,
     speed,
     sizeFactor,
@@ -222,12 +227,15 @@ function applyBleed(enemy, sharpness) {
 
 function applyStun(enemy) {
   const weapon = CONFIG.weapon;
-  const chance = clamp(0.22 + enemy.sizeFactor * 0.25 + weapon.weight * 0.02, 0, 0.95);
+  const chance = clamp(0.1 + enemy.sizeFactor * 0.12 + weapon.weight * 0.012, 0, 0.65);
   if (Math.random() >= chance) {
     return;
   }
 
-  const duration = weapon.baseStunSec * (1 + weapon.weight / 10) * (1 + enemy.sizeFactor * 0.45);
+  const duration =
+    weapon.baseStunSec *
+    (0.65 + weapon.weight / 16) *
+    (0.8 + enemy.sizeFactor * 0.25);
   enemy.status.stunSec = Math.max(enemy.status.stunSec, duration);
 }
 
@@ -313,10 +321,16 @@ function applySlashHitbox(slashAngle, hitEnemyIds) {
     const effect = calculateHitEffect(enemy, segment.t);
     enemy.hp -= effect.damage;
     enemy.hitFlash = 0.08;
+    const dx = enemy.x - player.x;
+    const dy = enemy.y - player.y;
+    const len = Math.hypot(dx, dy);
+    const pushX = len > 0.001 ? dx / len : Math.cos(slashAngle);
+    const pushY = len > 0.001 ? dy / len : Math.sin(slashAngle);
 
-    const pushAngle = angleTo(player, enemy);
-    enemy.x += Math.cos(pushAngle) * effect.knockback * CONFIG.slash.visualKnockbackScale;
-    enemy.y += Math.sin(pushAngle) * effect.knockback * CONFIG.slash.visualKnockbackScale;
+    enemy.x += pushX * effect.knockback * CONFIG.slash.visualKnockbackScale;
+    enemy.y += pushY * effect.knockback * CONFIG.slash.visualKnockbackScale;
+    enemy.vx += pushX * effect.knockback * CONFIG.slash.knockbackImpulseScale;
+    enemy.vy += pushY * effect.knockback * CONFIG.slash.knockbackImpulseScale;
 
     state.lastHitLabel = effect.hitLabel;
     hitEnemyIds.add(enemy);
@@ -399,12 +413,18 @@ function update(dt) {
 
     if (enemy.status.stunSec > 0) {
       enemy.status.stunSec = Math.max(0, enemy.status.stunSec - dt);
-      continue;
     }
 
+    const drag = Math.exp(-CONFIG.enemy.knockbackDrag * dt);
+    enemy.vx *= drag;
+    enemy.vy *= drag;
+    enemy.x += enemy.vx * dt;
+    enemy.y += enemy.vy * dt;
+
     const ang = angleTo(enemy, player);
-    enemy.x += Math.cos(ang) * enemy.speed * dt;
-    enemy.y += Math.sin(ang) * enemy.speed * dt;
+    const chaseScale = enemy.status.stunSec > 0 ? CONFIG.enemy.stunSlowRatio : 1;
+    enemy.x += Math.cos(ang) * enemy.speed * chaseScale * dt;
+    enemy.y += Math.sin(ang) * enemy.speed * chaseScale * dt;
 
     if (dist(enemy, player) <= enemy.radius + CONFIG.player.radius) {
       if (player.invincible <= 0) {
