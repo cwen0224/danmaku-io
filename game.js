@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305145851";
+const APP_VERSION = "20260305150349";
 
 const WEAPON_PRESETS = [
   {
@@ -93,7 +93,9 @@ const CONFIG = {
     baseSpeed: 320,
     hp: 100,
     invincibleSec: 0.45,
-    contactDamage: 12
+    contactDamage: 12,
+    blinkDistance: 290,
+    blinkCooldownSec: 1.15
   },
   slash: {
     baseArc: Math.PI * 0.5,
@@ -133,10 +135,12 @@ const state = {
   camera: { x: 0, y: 0 },
   enemies: [],
   deathParticles: [],
+  blinkEffects: [],
   elapsed: 0,
   kills: 0,
   spawnTimer: 0,
   slashTimer: 0,
+  blinkTimer: 0,
   running: true,
   lastTs: 0,
   weaponIndex: 0,
@@ -231,6 +235,100 @@ function drawDeathParticles() {
     ctx.fillStyle = `rgba(255, 175, 205, ${alpha.toFixed(3)})`;
     ctx.fillRect(-p.size, -p.size * 0.55, p.size * 2, p.size * 1.1);
     ctx.restore();
+  }
+}
+
+function spawnBlinkBurst(x, y) {
+  state.blinkEffects.push({
+    kind: "ring",
+    x,
+    y,
+    r: 10,
+    life: 0.26,
+    maxLife: 0.26
+  });
+
+  const shardCount = 14;
+  for (let i = 0; i < shardCount; i += 1) {
+    const angle = (i / shardCount) * Math.PI * 2 + Math.random() * 0.2;
+    const speed = 160 + Math.random() * 210;
+    const life = 0.18 + Math.random() * 0.22;
+    state.blinkEffects.push({
+      kind: "shard",
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life,
+      maxLife: life,
+      size: 2 + Math.random() * 3
+    });
+  }
+}
+
+function tryBlink() {
+  if (!state.running || !state.player) {
+    return;
+  }
+  if (state.blinkTimer < CONFIG.player.blinkCooldownSec) {
+    return;
+  }
+
+  const p = state.player;
+  let dx = state.mouse.x - p.x;
+  let dy = state.mouse.y - p.y;
+  let len = Math.hypot(dx, dy);
+  if (len < 0.001) {
+    dx = Math.cos(p.facing);
+    dy = Math.sin(p.facing);
+    len = 1;
+  }
+
+  const step = Math.min(CONFIG.player.blinkDistance, len);
+  const nx = dx / len;
+  const ny = dy / len;
+  const startX = p.x;
+  const startY = p.y;
+
+  p.x = clamp(startX + nx * step, CONFIG.player.radius, CONFIG.world.width - CONFIG.player.radius);
+  p.y = clamp(startY + ny * step, CONFIG.player.radius, CONFIG.world.height - CONFIG.player.radius);
+  p.facing = Math.atan2(ny, nx);
+  state.blinkTimer = 0;
+  state.lastHitLabel = "閃現";
+
+  spawnBlinkBurst(startX, startY);
+  spawnBlinkBurst(p.x, p.y);
+  updateCamera(0.016);
+}
+
+function updateBlinkEffects(dt) {
+  for (const fx of state.blinkEffects) {
+    fx.life -= dt;
+    if (fx.kind === "ring") {
+      fx.r += 300 * dt;
+    } else {
+      fx.vx *= Math.exp(-8.5 * dt);
+      fx.vy *= Math.exp(-8.5 * dt);
+      fx.x += fx.vx * dt;
+      fx.y += fx.vy * dt;
+    }
+  }
+  state.blinkEffects = state.blinkEffects.filter((fx) => fx.life > 0);
+}
+
+function drawBlinkEffects() {
+  for (const fx of state.blinkEffects) {
+    const alpha = clamp(fx.life / fx.maxLife, 0, 1);
+    if (fx.kind === "ring") {
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, fx.r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(130, 235, 255, ${alpha.toFixed(3)})`;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = `rgba(168, 250, 255, ${alpha.toFixed(3)})`;
+      ctx.fillRect(fx.x - fx.size, fx.y - fx.size * 0.5, fx.size * 2, fx.size);
+    }
   }
 }
 
@@ -635,6 +733,7 @@ function update(dt) {
   state.elapsed += dt;
   state.spawnTimer += dt;
   state.slashTimer += dt;
+  state.blinkTimer += dt;
 
   const player = state.player;
   const runtime = state.weaponRuntime;
@@ -739,6 +838,7 @@ function update(dt) {
   });
 
   updateDeathParticles(dt);
+  updateBlinkEffects(dt);
 
   if (player.hp <= 0) {
     state.running = false;
@@ -977,6 +1077,7 @@ function draw() {
   for (const enemy of state.enemies) {
     drawEnemy(enemy);
   }
+  drawBlinkEffects();
   drawDeathParticles();
 
   drawPlayer();
@@ -1018,10 +1119,12 @@ function reset() {
   updateMouseWorld();
   state.enemies = [];
   state.deathParticles = [];
+  state.blinkEffects = [];
   state.elapsed = 0;
   state.kills = 0;
   state.spawnTimer = 0;
   state.slashTimer = 0;
+  state.blinkTimer = CONFIG.player.blinkCooldownSec;
   state.running = true;
   state.lastTs = performance.now();
   state.lastHitLabel = "待命";
@@ -1061,6 +1164,13 @@ canvas.addEventListener("contextmenu", (event) => {
   event.preventDefault();
 });
 
+window.addEventListener("keydown", (event) => {
+  if (event.code === "Space") {
+    event.preventDefault();
+    tryBlink();
+  }
+});
+
 window.addEventListener("resize", resizeCanvas);
 restartBtn.addEventListener("click", reset);
 if (versionBadgeEl) {
@@ -1069,6 +1179,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
