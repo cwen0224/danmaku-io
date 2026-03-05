@@ -12,7 +12,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305161726";
+const APP_VERSION = "20260305161944";
 
 const WEAPON_PRESETS = [
   {
@@ -110,6 +110,7 @@ const CONFIG = {
     spawnSec: 1.2,
     minSpawnSec: 0.45,
     accelPerMin: 0.16,
+    maxCount: 120,
     edgePadding: 30,
     knockbackDrag: 8.5,
     stunSlowRatio: 0.18,
@@ -1018,7 +1019,7 @@ function update(dt) {
       CONFIG.enemy.spawnSec - state.elapsed * 0.004
     );
 
-    while (state.spawnTimer >= spawnInterval) {
+    while (state.spawnTimer >= spawnInterval && state.enemies.length < CONFIG.enemy.maxCount) {
       state.spawnTimer -= spawnInterval;
       spawnEnemy();
     }

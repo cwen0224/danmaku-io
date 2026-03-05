@@ -10,6 +10,7 @@ const ENEMY = {
   spawnSec: 1.2,
   minSpawnSec: 0.45,
   accelPerMin: 0.16,
+  maxCount: 120,
   edgePadding: 30,
   knockbackDrag: 8.5,
   stunSlowRatio: 0.18,
@@ -219,7 +220,7 @@ function updateWorld(dt) {
   }
 
   const spawnInterval = Math.max(ENEMY.minSpawnSec, ENEMY.spawnSec - elapsedSec * 0.004);
-  while (spawnTimer >= spawnInterval) {
+  while (spawnTimer >= spawnInterval && enemies.length < ENEMY.maxCount) {
     spawnTimer -= spawnInterval;
     spawnEnemy();
   }
