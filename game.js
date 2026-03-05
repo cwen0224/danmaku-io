@@ -12,7 +12,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305155809";
+const APP_VERSION = "20260305161258";
 
 const WEAPON_PRESETS = [
   {
@@ -164,6 +164,12 @@ const state = {
   }
 };
 
+const SERVER_ATTACK_KNOCKBACK = {
+  thrust: 4,
+  sweep: 2.25,
+  breaker: 1
+};
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -219,6 +225,10 @@ function upsertRemotePeer(peerState) {
     facing: Number(peerState.facing) || 0,
     hp: Number(peerState.hp) || 0,
     weapon: String(peerState.weapon || "未知"),
+    modeId: String(peerState.modeId || "sweep"),
+    bladeStartRatio: Number(peerState.bladeStartRatio) || 0.7,
+    runtime: peerState.runtime || null,
+    attackFx: existing ? existing.attackFx : null,
     t: Number(peerState.t) || Date.now()
   };
 
@@ -289,8 +299,43 @@ function setupMultiplayer() {
       }
     } else if (msg.type === "peer_join" || msg.type === "peer_state") {
       upsertRemotePeer(msg.peer);
+    } else if (msg.type === "peer_attack" && msg.id) {
+      const peer = state.remotePlayers.get(String(msg.id));
+      if (peer && msg.attack) {
+        peer.attackFx = {
+          ...msg.attack,
+          duration: Math.max(0.06, Number(msg.attack.duration) || 0.2),
+          progress: 0
+        };
+      }
     } else if (msg.type === "peer_leave" && msg.id) {
       state.remotePlayers.delete(String(msg.id));
+    } else if (msg.type === "world") {
+      if (msg.you && Number.isFinite(Number(msg.you.hp))) {
+        state.player.hp = Number(msg.you.hp);
+      }
+      if (Array.isArray(msg.enemies)) {
+        state.enemies = msg.enemies.map((enemy) => ({
+          id: String(enemy.id || ""),
+          x: Number(enemy.x) || 0,
+          y: Number(enemy.y) || 0,
+          vx: Number(enemy.vx) || 0,
+          vy: Number(enemy.vy) || 0,
+          radius: Number(enemy.radius) || 12,
+          speed: Number(enemy.speed) || 0,
+          sizeFactor: Number(enemy.sizeFactor) || 0.25,
+          facing: Number(enemy.facing) || 0,
+          weaponRange: Number(enemy.weaponRange) || 36,
+          weaponCooldown: Number(enemy.weaponCooldown) || 1.3,
+          weaponDamage: Number(enemy.weaponDamage) || 4,
+          weaponSwingSec: Number(enemy.weaponSwingSec) || 0.34,
+          attackTimer: Number(enemy.attackTimer) || 0,
+          attackState: enemy.attackState || null,
+          hp: Number(enemy.hp) || 1,
+          hitFlash: Number(enemy.hitFlash) || 0,
+          status: enemy.status || { bleedSec: 0, bleedDps: 0, stunSec: 0 }
+        }));
+      }
     }
 
     if (state.network.enabled) {
@@ -312,6 +357,12 @@ function updateMultiplayer(dt) {
     const t = 1 - Math.exp(-12 * dt);
     peer.x = lerp(peer.x, peer.tx, t);
     peer.y = lerp(peer.y, peer.ty, t);
+    if (peer.attackFx) {
+      peer.attackFx.progress = clamp(peer.attackFx.progress + dt / peer.attackFx.duration, 0, 1);
+      if (peer.attackFx.progress >= 1) {
+        peer.attackFx = null;
+      }
+    }
   }
 
   if (state.network.ws.readyState !== WebSocket.OPEN) {
@@ -332,7 +383,17 @@ function updateMultiplayer(dt) {
         y: state.player.y,
         facing: state.player.facing,
         hp: state.player.hp,
-        weapon: CONFIG.weapon.name
+        weapon: CONFIG.weapon.name,
+        modeId: ATTACK_MODES[state.attackModeIndex].id,
+        bladeStartRatio: CONFIG.weapon.bladeStartRatio ?? CONFIG.slash.headHitThreshold,
+        runtime: {
+          range: state.weaponRuntime.range,
+          arc: state.weaponRuntime.arc,
+          baseDamage: state.weaponRuntime.baseDamage,
+          baseKnockback: state.weaponRuntime.baseKnockback,
+          damageModeMult: state.weaponRuntime.damageModeMult,
+          knockbackModeMult: state.weaponRuntime.knockbackModeMult
+        }
       }
     })
   );
@@ -765,9 +826,40 @@ function calculateHitEffect(enemy, hitRatio) {
   };
 }
 
+function getSlashDuration(runtime, mode) {
+  const cleaveArc = (Math.PI * 2) / 3;
+  const baseDuration = Math.min(CONFIG.slash.swingDurationSec, runtime.cooldown * 0.6);
+  const arcDurationScale = mode.id === "breaker" ? runtime.arc / cleaveArc : 1;
+  return clamp(baseDuration * arcDurationScale, 0.08, runtime.cooldown * 0.95);
+}
+
+function sendAttackEvent(slash, mode, runtime) {
+  if (!state.network.enabled || !state.network.ws || state.network.ws.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  state.network.ws.send(
+    JSON.stringify({
+      type: "attack",
+      attack: {
+        modeId: mode.id,
+        centerAngle: slash.centerAngle,
+        startAngle: slash.startAngle,
+        endAngle: slash.endAngle,
+        direction: slash.direction,
+        range: runtime.range,
+        arc: runtime.arc,
+        duration: slash.duration,
+        bladeStartRatio: CONFIG.weapon.bladeStartRatio ?? CONFIG.slash.headHitThreshold
+      }
+    })
+  );
+}
+
 function startSlash() {
   const player = state.player;
   const runtime = state.weaponRuntime;
+  const mode = ATTACK_MODES[state.attackModeIndex];
   const facing = getNearestEnemyAngle(player);
   const direction = state.slashDirection;
   const halfArc = runtime.arc * 0.5;
@@ -782,11 +874,14 @@ function startSlash() {
     startAngle,
     endAngle,
     currentAngle: startAngle,
-    hitEnemyIds: new Set()
+    hitEnemyIds: new Set(),
+    duration: getSlashDuration(runtime, mode),
+    modeId: mode.id
   };
 
   state.slashDirection *= -1;
   state.lastHitLabel = "揮空";
+  sendAttackEvent(state.activeSlash, mode, runtime);
 }
 
 function applySlashHitbox(slashAngle, hitEnemyIds) {
@@ -834,23 +929,19 @@ function applySlashHitbox(slashAngle, hitEnemyIds) {
   }
 }
 
-function updateActiveSlash(dt) {
+function updateActiveSlash(dt, applyHits = true) {
   if (!state.activeSlash) {
     return;
   }
 
-  const runtime = state.weaponRuntime;
-  const mode = ATTACK_MODES[state.attackModeIndex];
-  const cleaveArc = (Math.PI * 2) / 3;
-  const baseDuration = Math.min(CONFIG.slash.swingDurationSec, runtime.cooldown * 0.6);
-  const arcDurationScale = mode.id === "breaker" ? runtime.arc / cleaveArc : 1;
-  const duration = clamp(baseDuration * arcDurationScale, 0.08, runtime.cooldown * 0.95);
   const slash = state.activeSlash;
-  const nextProgress = clamp(slash.progress + dt / duration, 0, 1);
+  const nextProgress = clamp(slash.progress + dt / slash.duration, 0, 1);
 
   slash.progress = nextProgress;
   slash.currentAngle = lerp(slash.startAngle, slash.endAngle, slash.progress);
-  applySlashHitbox(slash.currentAngle, slash.hitEnemyIds);
+  if (applyHits) {
+    applySlashHitbox(slash.currentAngle, slash.hitEnemyIds);
+  }
 
   if (slash.progress >= 1) {
     state.activeSlash = null;
@@ -921,14 +1012,16 @@ function update(dt) {
   player.facing = getNearestEnemyAngle(player);
   updateCamera(dt);
 
-  const spawnInterval = Math.max(
-    CONFIG.enemy.minSpawnSec,
-    CONFIG.enemy.spawnSec - state.elapsed * 0.004
-  );
+  if (!state.network.enabled) {
+    const spawnInterval = Math.max(
+      CONFIG.enemy.minSpawnSec,
+      CONFIG.enemy.spawnSec - state.elapsed * 0.004
+    );
 
-  while (state.spawnTimer >= spawnInterval) {
-    state.spawnTimer -= spawnInterval;
-    spawnEnemy();
+    while (state.spawnTimer >= spawnInterval) {
+      state.spawnTimer -= spawnInterval;
+      spawnEnemy();
+    }
   }
 
   if (!state.activeSlash && state.slashTimer >= runtime.cooldown) {
@@ -936,73 +1029,77 @@ function update(dt) {
     startSlash();
   }
 
-  updateActiveSlash(dt);
+  updateActiveSlash(dt, !state.network.enabled);
 
-  for (const enemy of state.enemies) {
-    enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
+  if (!state.network.enabled) {
+    for (const enemy of state.enemies) {
+      enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
 
-    if (enemy.status.bleedSec > 0) {
-      enemy.status.bleedSec = Math.max(0, enemy.status.bleedSec - dt);
-      enemy.hp -= enemy.status.bleedDps * dt;
-      if (enemy.status.bleedSec === 0) {
-        enemy.status.bleedDps = 0;
+      if (enemy.status.bleedSec > 0) {
+        enemy.status.bleedSec = Math.max(0, enemy.status.bleedSec - dt);
+        enemy.hp -= enemy.status.bleedDps * dt;
+        if (enemy.status.bleedSec === 0) {
+          enemy.status.bleedDps = 0;
+        }
       }
-    }
 
-    if (enemy.status.stunSec > 0) {
-      enemy.status.stunSec = Math.max(0, enemy.status.stunSec - dt);
-    }
-
-    const drag = Math.exp(-CONFIG.enemy.knockbackDrag * dt);
-    enemy.vx *= drag;
-    enemy.vy *= drag;
-    enemy.x += enemy.vx * dt;
-    enemy.y += enemy.vy * dt;
-
-    const ang = angleTo(enemy, player);
-    const turnT = 1 - Math.exp(-CONFIG.enemy.turnLerpPerSec * dt);
-    enemy.facing = lerp(enemy.facing, ang, turnT);
-    const chaseScale = enemy.status.stunSec > 0 ? CONFIG.enemy.stunSlowRatio : 1;
-    enemy.x += Math.cos(ang) * enemy.speed * chaseScale * dt;
-    enemy.y += Math.sin(ang) * enemy.speed * chaseScale * dt;
-
-    if (enemy.attackState) {
-      const attack = enemy.attackState;
-      attack.progress = clamp(attack.progress + dt / enemy.weaponSwingSec, 0, 1);
-      attack.currentAngle = attack.centerAngle;
-      if (attack.progress < 0.28) {
-        attack.reachScale = 0.62 + (attack.progress / 0.28) * 0.78;
-      } else if (attack.progress < 0.58) {
-        attack.reachScale = 1.4;
-      } else {
-        attack.reachScale = 1.4 - ((attack.progress - 0.58) / 0.42) * 0.58;
+      if (enemy.status.stunSec > 0) {
+        enemy.status.stunSec = Math.max(0, enemy.status.stunSec - dt);
       }
-      tryEnemyWeaponHit(enemy);
-      if (attack.progress >= 1) {
-        enemy.attackState = null;
-        enemy.attackTimer = 0;
-      }
-    } else if (enemy.status.stunSec <= 0) {
-      enemy.attackTimer += dt;
-      if (
-        enemy.attackTimer >= enemy.weaponCooldown &&
-        dist(enemy, player) <= enemy.weaponRange + CONFIG.player.radius + 6
-      ) {
-        startEnemyAttack(enemy, enemy.facing);
+
+      const drag = Math.exp(-CONFIG.enemy.knockbackDrag * dt);
+      enemy.vx *= drag;
+      enemy.vy *= drag;
+      enemy.x += enemy.vx * dt;
+      enemy.y += enemy.vy * dt;
+
+      const ang = angleTo(enemy, player);
+      const turnT = 1 - Math.exp(-CONFIG.enemy.turnLerpPerSec * dt);
+      enemy.facing = lerp(enemy.facing, ang, turnT);
+      const chaseScale = enemy.status.stunSec > 0 ? CONFIG.enemy.stunSlowRatio : 1;
+      enemy.x += Math.cos(ang) * enemy.speed * chaseScale * dt;
+      enemy.y += Math.sin(ang) * enemy.speed * chaseScale * dt;
+
+      if (enemy.attackState) {
+        const attack = enemy.attackState;
+        attack.progress = clamp(attack.progress + dt / enemy.weaponSwingSec, 0, 1);
+        attack.currentAngle = attack.centerAngle;
+        if (attack.progress < 0.28) {
+          attack.reachScale = 0.62 + (attack.progress / 0.28) * 0.78;
+        } else if (attack.progress < 0.58) {
+          attack.reachScale = 1.4;
+        } else {
+          attack.reachScale = 1.4 - ((attack.progress - 0.58) / 0.42) * 0.58;
+        }
+        tryEnemyWeaponHit(enemy);
+        if (attack.progress >= 1) {
+          enemy.attackState = null;
+          enemy.attackTimer = 0;
+        }
+      } else if (enemy.status.stunSec <= 0) {
+        enemy.attackTimer += dt;
+        if (
+          enemy.attackTimer >= enemy.weaponCooldown &&
+          dist(enemy, player) <= enemy.weaponRange + CONFIG.player.radius + 6
+        ) {
+          startEnemyAttack(enemy, enemy.facing);
+        }
       }
     }
   }
 
   player.invincible = Math.max(0, player.invincible - dt);
 
-  state.enemies = state.enemies.filter((enemy) => {
-    if (enemy.hp > 0) {
-      return true;
-    }
-    spawnDeathShatter(enemy);
-    state.kills += 1;
-    return false;
-  });
+  if (!state.network.enabled) {
+    state.enemies = state.enemies.filter((enemy) => {
+      if (enemy.hp > 0) {
+        return true;
+      }
+      spawnDeathShatter(enemy);
+      state.kills += 1;
+      return false;
+    });
+  }
 
   updateDeathParticles(dt);
   updateBlinkEffects(dt);
@@ -1182,6 +1279,61 @@ function drawRemotePlayer(peer) {
   ctx.fillText(peer.weapon, peer.x, peer.y - CONFIG.player.radius - 12);
 }
 
+function drawRemoteAttack(peer) {
+  if (!peer.attackFx) {
+    return;
+  }
+  const fx = peer.attackFx;
+  const modeId = fx.modeId || "sweep";
+  const isThrustMode = modeId === "thrust";
+  const progress = clamp(fx.progress, 0, 1);
+  const range = Number(fx.range) || 90;
+  const angle = isThrustMode
+    ? Number(fx.centerAngle) || peer.facing
+    : lerp(Number(fx.startAngle) || peer.facing, Number(fx.endAngle) || peer.facing, progress);
+  const bladeStartRatio = Number(fx.bladeStartRatio) || 0.7;
+  const coreWidth = CONFIG.slash.hitboxRadius * 1.8;
+  const shaftDist = range * bladeStartRatio;
+  const tipDist = range;
+
+  const shaftX = peer.x + Math.cos(angle) * shaftDist;
+  const shaftY = peer.y + Math.sin(angle) * shaftDist;
+  const tipX = peer.x + Math.cos(angle) * tipDist;
+  const tipY = peer.y + Math.sin(angle) * tipDist;
+
+  if (!isThrustMode) {
+    ctx.beginPath();
+    ctx.arc(
+      peer.x,
+      peer.y,
+      range * 0.72,
+      Number(fx.startAngle) || peer.facing,
+      angle,
+      Number(fx.direction) < 0
+    );
+    ctx.strokeStyle = "rgba(130, 230, 160, 0.2)";
+    ctx.lineWidth = CONFIG.slash.hitboxRadius * 1.1;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(peer.x, peer.y);
+  ctx.lineTo(shaftX, shaftY);
+  ctx.strokeStyle = "rgba(209, 168, 112, 0.88)";
+  ctx.lineWidth = coreWidth;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(shaftX, shaftY);
+  ctx.lineTo(tipX, tipY);
+  ctx.strokeStyle = "rgba(218, 245, 255, 0.92)";
+  ctx.lineWidth = coreWidth * 0.8;
+  ctx.lineCap = "round";
+  ctx.stroke();
+}
+
 function drawPlayer() {
   const player = state.player;
 
@@ -1265,6 +1417,7 @@ function draw() {
   }
   for (const peer of state.remotePlayers.values()) {
     drawRemotePlayer(peer);
+    drawRemoteAttack(peer);
   }
   drawBlinkEffects();
   drawDeathParticles();
