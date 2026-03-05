@@ -628,9 +628,11 @@ function drawWeaponHitbox() {
   const player = state.player;
   const runtime = state.weaponRuntime;
   const slash = state.activeSlash;
+  if (!slash) {
+    return;
+  }
   const mode = ATTACK_MODES[state.attackModeIndex];
   const isThrustMode = mode.id === "thrust";
-  const idleReady = clamp(state.slashTimer / runtime.cooldown, 0, 1);
   const angle = slash
     ? (isThrustMode ? slash.centerAngle : slash.currentAngle)
     : player.facing;
@@ -655,11 +657,11 @@ function drawWeaponHitbox() {
   const headStartY = anchorY + Math.sin(angle) * headStartDistance;
   const tipX = anchorX + Math.cos(angle) * tipDistance;
   const tipY = anchorY + Math.sin(angle) * tipDistance;
-  const coreWidth = slash ? CONFIG.slash.hitboxRadius * 1.9 : 7 + idleReady * 4;
-  const shaftColor = slash ? "rgba(209, 168, 112, 0.96)" : "rgba(170, 132, 82, 0.8)";
-  const bladeColor = slash ? "rgba(225, 248, 255, 0.98)" : "rgba(166, 205, 220, 0.9)";
+  const coreWidth = CONFIG.slash.hitboxRadius * 1.9;
+  const shaftColor = "rgba(209, 168, 112, 0.96)";
+  const bladeColor = "rgba(225, 248, 255, 0.98)";
 
-  if (slash && !isThrustMode) {
+  if (!isThrustMode) {
     ctx.beginPath();
     ctx.arc(
       player.x,
@@ -675,7 +677,7 @@ function drawWeaponHitbox() {
     ctx.stroke();
   }
 
-  if (slash && isThrustMode) {
+  if (isThrustMode) {
     const trailTipX = player.x + Math.cos(angle) * runtime.range * 1.52;
     const trailTipY = player.y + Math.sin(angle) * runtime.range * 1.52;
     ctx.beginPath();
@@ -705,12 +707,12 @@ function drawWeaponHitbox() {
 
   ctx.beginPath();
   ctx.arc(headStartX, headStartY, coreWidth * 0.44, 0, Math.PI * 2);
-  ctx.fillStyle = slash ? "rgba(235, 210, 166, 0.9)" : "rgba(184, 147, 96, 0.75)";
+  ctx.fillStyle = "rgba(235, 210, 166, 0.9)";
   ctx.fill();
 
   ctx.beginPath();
   ctx.arc(tipX, tipY, coreWidth * 0.48, 0, Math.PI * 2);
-  ctx.fillStyle = slash ? "rgba(244, 251, 255, 0.95)" : "rgba(176, 216, 230, 0.85)";
+  ctx.fillStyle = "rgba(244, 251, 255, 0.95)";
   ctx.fill();
 }
 
@@ -739,15 +741,40 @@ function drawPlayer() {
   ctx.fillStyle = player.invincible > 0 ? "#7fd8ff" : "#d7e7ff";
   ctx.fill();
 
+  drawFacingArrow(player);
+}
+
+function drawFacingArrow(player) {
+  const angle = player.facing;
+  const baseDist = CONFIG.player.radius + 8;
+  const tipDist = baseDist + 18;
+  const wingDist = tipDist - 9;
+  const wingSpread = 0.52;
+
+  const baseX = player.x + Math.cos(angle) * baseDist;
+  const baseY = player.y + Math.sin(angle) * baseDist;
+  const tipX = player.x + Math.cos(angle) * tipDist;
+  const tipY = player.y + Math.sin(angle) * tipDist;
+  const leftX = player.x + Math.cos(angle + wingSpread) * wingDist;
+  const leftY = player.y + Math.sin(angle + wingSpread) * wingDist;
+  const rightX = player.x + Math.cos(angle - wingSpread) * wingDist;
+  const rightY = player.y + Math.sin(angle - wingSpread) * wingDist;
+
   ctx.beginPath();
-  ctx.moveTo(player.x, player.y);
-  ctx.lineTo(
-    player.x + Math.cos(player.facing) * 18,
-    player.y + Math.sin(player.facing) * 18
-  );
-  ctx.strokeStyle = "rgba(57, 217, 138, 0.7)";
-  ctx.lineWidth = 2;
+  ctx.moveTo(baseX, baseY);
+  ctx.lineTo(tipX, tipY);
+  ctx.strokeStyle = "rgba(120, 248, 180, 0.95)";
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = "round";
   ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(leftX, leftY);
+  ctx.lineTo(rightX, rightY);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(164, 255, 208, 0.95)";
+  ctx.fill();
 }
 
 function drawWorldBackground() {
