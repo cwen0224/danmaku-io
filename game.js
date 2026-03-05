@@ -155,6 +155,7 @@ const state = {
   player: null,
   camera: { x: 0, y: 0 },
   enemies: [],
+  deathParticles: [],
   elapsed: 0,
   kills: 0,
   spawnTimer: 0,
@@ -206,6 +207,54 @@ function pointSegmentInfo(point, a, b) {
     t,
     distance: Math.hypot(dx, dy)
   };
+}
+
+function spawnDeathShatter(enemy) {
+  const shardCount = 10 + Math.floor(Math.random() * 6);
+  for (let i = 0; i < shardCount; i += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 110 + Math.random() * 280 + enemy.radius * 2.2;
+    const life = 0.22 + Math.random() * 0.26;
+    const size = 2 + Math.random() * (enemy.radius * 0.22);
+
+    state.deathParticles.push({
+      x: enemy.x + Math.cos(angle) * (enemy.radius * 0.2),
+      y: enemy.y + Math.sin(angle) * (enemy.radius * 0.2),
+      vx: Math.cos(angle) * speed + enemy.vx * 0.12,
+      vy: Math.sin(angle) * speed + enemy.vy * 0.12,
+      life,
+      maxLife: life,
+      size,
+      spin: (Math.random() - 0.5) * 12,
+      rot: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function updateDeathParticles(dt) {
+  const drag = Math.exp(-6.8 * dt);
+  for (const p of state.deathParticles) {
+    p.life -= dt;
+    p.vx *= drag;
+    p.vy *= drag;
+    p.vy += 180 * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.rot += p.spin * dt;
+  }
+  state.deathParticles = state.deathParticles.filter((p) => p.life > 0);
+}
+
+function drawDeathParticles() {
+  for (const p of state.deathParticles) {
+    const alpha = clamp(p.life / p.maxLife, 0, 1);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillStyle = `rgba(255, 175, 205, ${alpha.toFixed(3)})`;
+    ctx.fillRect(-p.size, -p.size * 0.55, p.size * 2, p.size * 1.1);
+    ctx.restore();
+  }
 }
 
 function getCameraBounds() {
@@ -612,9 +661,12 @@ function update(dt) {
     if (enemy.hp > 0) {
       return true;
     }
+    spawnDeathShatter(enemy);
     state.kills += 1;
     return false;
   });
+
+  updateDeathParticles(dt);
 
   if (player.hp <= 0) {
     state.running = false;
@@ -816,6 +868,7 @@ function draw() {
   for (const enemy of state.enemies) {
     drawEnemy(enemy);
   }
+  drawDeathParticles();
 
   drawPlayer();
   if (state.activeSlash) {
@@ -853,6 +906,7 @@ function reset() {
   state.mouseScreen.y = canvas.height * 0.5;
   updateMouseWorld();
   state.enemies = [];
+  state.deathParticles = [];
   state.elapsed = 0;
   state.kills = 0;
   state.spawnTimer = 0;
