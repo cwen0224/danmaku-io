@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305141010";
+const APP_VERSION = "20260305141520";
 
 const WEAPON_PRESETS = [
   {
@@ -21,14 +21,7 @@ const WEAPON_PRESETS = [
     weight: 5.2,
     center: 5.6,
     headSharpness: 9.4,
-    shaftSharpness: 1.2,
-    baseDamage: 20,
-    baseKnockback: 110,
-    baseCooldown: 0.27,
-    bleedChanceBase: 0.16,
-    bleedDpsBase: 7,
-    bleedDuration: 2.6,
-    baseStunSec: 0.1
+    shaftSharpness: 1.2
   },
   {
     name: "大劍",
@@ -37,14 +30,7 @@ const WEAPON_PRESETS = [
     weight: 7.8,
     center: 6.8,
     headSharpness: 8.3,
-    shaftSharpness: 7.7,
-    baseDamage: 29,
-    baseKnockback: 92,
-    baseCooldown: 0.33,
-    bleedChanceBase: 0.12,
-    bleedDpsBase: 6.5,
-    bleedDuration: 2.2,
-    baseStunSec: 0.08
+    shaftSharpness: 7.7
   },
   {
     name: "匕首",
@@ -53,14 +39,7 @@ const WEAPON_PRESETS = [
     weight: 2.2,
     center: 4.2,
     headSharpness: 9.6,
-    shaftSharpness: 4.2,
-    baseDamage: 12,
-    baseKnockback: 54,
-    baseCooldown: 0.13,
-    bleedChanceBase: 0.2,
-    bleedDpsBase: 8.5,
-    bleedDuration: 2.1,
-    baseStunSec: 0.04
+    shaftSharpness: 4.2
   },
   {
     name: "戰槌",
@@ -69,14 +48,7 @@ const WEAPON_PRESETS = [
     weight: 9.3,
     center: 7.6,
     headSharpness: 1.4,
-    shaftSharpness: 1.0,
-    baseDamage: 32,
-    baseKnockback: 165,
-    baseCooldown: 0.41,
-    bleedChanceBase: 0.03,
-    bleedDpsBase: 4.5,
-    bleedDuration: 1.6,
-    baseStunSec: 0.16
+    shaftSharpness: 1.0
   }
 ];
 
@@ -312,28 +284,37 @@ function cycleAttackMode() {
 function deriveWeaponRuntime() {
   const weapon = CONFIG.weapon;
   const mode = ATTACK_MODES[state.attackModeIndex];
-  const moveMultiplier = clamp(1 - weapon.weight / 16, 0.45, 1.0);
-  const range = (54 + weapon.length * 9) * mode.rangeMult;
-  const computedArc = (CONFIG.slash.baseArc + (weapon.length - 5.5) * 0.02) * mode.arcMult;
+  const L = clamp(weapon.length, 1, 10);
+  const W = clamp(weapon.weight, 1, 10);
+  const C = clamp(weapon.center, 1, 10);
+  const headS = clamp(weapon.headSharpness, 1, 10);
+  const shaftS = clamp(weapon.shaftSharpness, 1, 10);
+  const avgS = (headS + shaftS) * 0.5;
+
+  const moveMultiplier = clamp(1 - W / 16, 0.45, 1.0);
+  const range = (46 + L * 11) * mode.rangeMult;
+  const computedArc = (CONFIG.slash.baseArc + (L - 5.5) * 0.02) * mode.arcMult;
   const arc = clamp(mode.arcOverride ?? computedArc, Math.PI * 0.18, Math.PI * 2);
-  const weightSlow = 1 + (weapon.weight - 5) * 0.06;
-  const lengthSlow = 1 + (weapon.length - 6) * 0.03;
-  const centerSpeed = 1 - (weapon.center - 5.5) * 0.03;
-  const cooldown = clamp(
-    weapon.baseCooldown * weightSlow * lengthSlow * centerSpeed * mode.cooldownMult,
-    0.08,
-    0.95
-  );
-  const damageWeightMult = 1 + weapon.weight / 20;
-  const damageCenterMult = 1 + (weapon.center - 5.5) / 15;
+  const baseCooldown = clamp(0.46 - C * 0.024 + W * 0.018 + L * 0.01, 0.11, 0.9);
+  const cooldown = clamp(baseCooldown * mode.cooldownMult, 0.08, 0.95);
+  const baseDamage = 6 + W * 2.4 + C * 1.7 + L * 0.7;
+  const baseKnockback = 30 + W * 9 + L * 4 + (5 - avgS) * 5;
+  const bleedChanceBase = clamp((headS - 6) / 22 + (C - 5) / 70, 0.02, 0.45);
+  const bleedDpsBase = 2 + headS * 0.9 + W * 0.35;
+  const bleedDuration = clamp(0.9 + C * 0.18 + L * 0.05, 1.0, 3.4);
+  const baseStunSec = clamp(0.04 + W * 0.013 + (5 - avgS) * 0.01, 0.04, 0.28);
 
   return {
     moveMultiplier,
     range,
     arc,
     cooldown,
-    damageWeightMult,
-    damageCenterMult,
+    baseDamage,
+    baseKnockback,
+    bleedChanceBase,
+    bleedDpsBase,
+    bleedDuration,
+    baseStunSec,
     damageModeMult: mode.damageMult,
     knockbackModeMult: mode.knockbackMult,
     impulseModeMult: mode.impulseMult
@@ -434,19 +415,18 @@ function spawnEnemy() {
   });
 }
 
-function applyBleed(enemy, sharpness) {
-  const weapon = CONFIG.weapon;
-  const chance = clamp(weapon.bleedChanceBase + (sharpness - 7) * 0.09, 0, 0.72);
+function applyBleed(enemy, sharpness, runtime) {
+  const chance = clamp(runtime.bleedChanceBase + (sharpness - 7) * 0.09, 0, 0.72);
   if (Math.random() >= chance) {
     return;
   }
 
-  const dps = weapon.bleedDpsBase * (1 + (sharpness - 7) * 0.18);
-  enemy.status.bleedSec = Math.max(enemy.status.bleedSec, weapon.bleedDuration);
+  const dps = runtime.bleedDpsBase * (1 + (sharpness - 7) * 0.18);
+  enemy.status.bleedSec = Math.max(enemy.status.bleedSec, runtime.bleedDuration);
   enemy.status.bleedDps = Math.max(enemy.status.bleedDps, dps);
 }
 
-function applyStun(enemy) {
+function applyStun(enemy, runtime) {
   const weapon = CONFIG.weapon;
   const chance = clamp(0.1 + enemy.sizeFactor * 0.12 + weapon.weight * 0.012, 0, 0.65);
   if (Math.random() >= chance) {
@@ -454,7 +434,7 @@ function applyStun(enemy) {
   }
 
   const duration =
-    weapon.baseStunSec *
+    runtime.baseStunSec *
     (0.65 + weapon.weight / 16) *
     (0.8 + enemy.sizeFactor * 0.25);
   enemy.status.stunSec = Math.max(enemy.status.stunSec, duration);
@@ -467,20 +447,20 @@ function calculateHitEffect(enemy, hitRatio) {
   const isHeadHit = hitRatio >= bladeStartRatio;
   const sharpness = isHeadHit ? weapon.headSharpness : weapon.shaftSharpness;
 
-  let damage = weapon.baseDamage * runtime.damageWeightMult * runtime.damageCenterMult;
-  let knockback = weapon.baseKnockback * (1 + weapon.weight / 12);
+  let damage = runtime.baseDamage;
+  let knockback = runtime.baseKnockback;
   let hitLabel = "混合";
 
   if (sharpness >= 7) {
     const sharpBonus = 1 + (sharpness - 7) * 0.14;
     damage *= sharpBonus;
     knockback *= 0.55;
-    applyBleed(enemy, sharpness);
+    applyBleed(enemy, sharpness, runtime);
     hitLabel = "利刃";
   } else if (sharpness <= 3) {
     const bluntEnergy = 1 + (3 - sharpness) * 0.16;
     knockback *= 1.5 * bluntEnergy;
-    applyStun(enemy);
+    applyStun(enemy, runtime);
     hitLabel = "鈍擊";
   } else {
     const hybridBonus = 1 + (sharpness - 5) * 0.05;
