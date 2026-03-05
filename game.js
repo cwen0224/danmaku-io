@@ -41,15 +41,15 @@ const CONFIG = {
     cameraLerp: 12
   },
   weapon: {
-    name: "訓練長戟",
-    length: 8.2,
-    weight: 6.4,
-    center: 6.0,
-    headSharpness: 9.0,
-    shaftSharpness: 1.8,
-    baseDamage: 22,
-    baseKnockback: 95,
-    baseCooldown: 0.3,
+    name: "長矛",
+    length: 9.0,
+    weight: 5.2,
+    center: 5.6,
+    headSharpness: 9.4,
+    shaftSharpness: 1.2,
+    baseDamage: 20,
+    baseKnockback: 110,
+    baseCooldown: 0.27,
     bleedChanceBase: 0.16,
     bleedDpsBase: 7,
     bleedDuration: 2.6,
@@ -497,9 +497,14 @@ function drawWeaponHitbox() {
   const slash = state.activeSlash;
   const idleReady = clamp(state.slashTimer / runtime.cooldown, 0, 1);
   const angle = slash ? slash.currentAngle : player.facing;
+  const headStartDistance = runtime.range * CONFIG.slash.headHitThreshold;
+  const headStartX = player.x + Math.cos(angle) * headStartDistance;
+  const headStartY = player.y + Math.sin(angle) * headStartDistance;
   const tipX = player.x + Math.cos(angle) * runtime.range;
   const tipY = player.y + Math.sin(angle) * runtime.range;
   const coreWidth = slash ? CONFIG.slash.hitboxRadius * 1.9 : 7 + idleReady * 4;
+  const shaftColor = slash ? "rgba(209, 168, 112, 0.96)" : "rgba(170, 132, 82, 0.8)";
+  const bladeColor = slash ? "rgba(225, 248, 255, 0.98)" : "rgba(166, 205, 220, 0.9)";
 
   if (slash) {
     ctx.beginPath();
@@ -519,15 +524,28 @@ function drawWeaponHitbox() {
 
   ctx.beginPath();
   ctx.moveTo(player.x, player.y);
-  ctx.lineTo(tipX, tipY);
-  ctx.strokeStyle = slash ? "rgba(131, 255, 200, 0.95)" : `rgba(57, 217, 138, ${(0.5 + idleReady * 0.3).toFixed(3)})`;
+  ctx.lineTo(headStartX, headStartY);
+  ctx.strokeStyle = shaftColor;
   ctx.lineWidth = coreWidth;
   ctx.lineCap = "round";
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.arc(tipX, tipY, coreWidth * 0.55, 0, Math.PI * 2);
-  ctx.fillStyle = slash ? "rgba(200, 255, 225, 0.92)" : "rgba(100, 230, 170, 0.7)";
+  ctx.moveTo(headStartX, headStartY);
+  ctx.lineTo(tipX, tipY);
+  ctx.strokeStyle = bladeColor;
+  ctx.lineWidth = coreWidth * 0.82;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(headStartX, headStartY, coreWidth * 0.44, 0, Math.PI * 2);
+  ctx.fillStyle = slash ? "rgba(235, 210, 166, 0.9)" : "rgba(184, 147, 96, 0.75)";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(tipX, tipY, coreWidth * 0.48, 0, Math.PI * 2);
+  ctx.fillStyle = slash ? "rgba(244, 251, 255, 0.95)" : "rgba(176, 216, 230, 0.85)";
   ctx.fill();
 }
 
