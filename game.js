@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305145538";
+const APP_VERSION = "20260305145851";
 
 const WEAPON_PRESETS = [
   {
@@ -315,7 +315,8 @@ function deriveWeaponRuntime() {
   const computedArc = (CONFIG.slash.baseArc + (L - 5.5) * 0.02) * mode.arcMult;
   const arc = clamp(mode.arcOverride ?? computedArc, Math.PI * 0.18, Math.PI * 2);
   const baseCooldown = clamp(0.46 - C * 0.024 + W * 0.018 + L * 0.01, 0.11, 0.9);
-  const cooldown = clamp(baseCooldown * mode.cooldownMult, 0.08, 0.95);
+  const agilityBonus = clamp((6 - L) * 0.05 + (6 - W) * 0.045, -0.12, 0.36);
+  const cooldown = clamp(baseCooldown * (1 - agilityBonus) * mode.cooldownMult, 0.06, 0.95);
   const baseDamage = 6 + W * 2.4 + C * 1.7 + L * 0.7;
   const baseKnockback = 30 + W * 9 + L * 4 + (5 - avgS) * 5;
   const bleedChanceBase = clamp((headS - 6) / 22 + (C - 5) / 70, 0.02, 0.45);
@@ -1068,6 +1069,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
