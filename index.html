@@ -32,8 +32,11 @@
   </main>
 
   <script>
+    window.DANMAKU_WS_URL = "";
+  </script>
+  <script>
     (function loadGameWithVersion() {
-      const fallbackVersion = "20260305154902";
+      const fallbackVersion = "20260305155620";
       const vUrl = `version.json?ts=${Date.now()}`;
       fetch(vUrl, { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error("version fetch failed"))))

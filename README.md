@@ -25,6 +25,26 @@ index.html?mp=ws://localhost:8080
 ```
 4. 畫面上方 `連線` 會顯示 `已連線(n)`，並看到其他玩家位置與朝向。
 
+## 免費上線（Render + GitHub Pages）
+1. 到 Render 建立 `Web Service`，連接這個 GitHub repo。
+2. Render 設定：
+```text
+Runtime: Node
+Build Command: npm install
+Start Command: npm start
+Plan: Free
+```
+3. 部署完成後，取得 WebSocket 網址（例如 `wss://danmaku-io-relay.onrender.com`）。
+4. 編輯 `index.html`，把這行改成你的 Render 網址：
+```html
+window.DANMAKU_WS_URL = "wss://danmaku-io-relay.onrender.com";
+```
+5. 提交並推送到 GitHub，Pages 更新後，玩家直接開網頁就會自動連線。
+6. 也可以臨時覆蓋連線位址：
+```text
+https://<你的帳號>.github.io/<repo>/?mp=wss://danmaku-io-relay.onrender.com
+```
+
 ## 部署到 GitHub Pages
 
 1. 在 GitHub 建立新 repo（例如 `danmaku-io`）。

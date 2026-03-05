@@ -12,7 +12,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305154902";
+const APP_VERSION = "20260305155620";
 
 const WEAPON_PRESETS = [
   {
@@ -187,8 +187,9 @@ function lerp(a, b, t) {
 function getMultiplayerUrl() {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get("mp") || params.get("ws");
+  const configured = window.DANMAKU_WS_URL ? String(window.DANMAKU_WS_URL).trim() : "";
   if (!raw) {
-    return "";
+    return configured;
   }
   if (raw === "1" || raw === "on") {
     const wsProto = window.location.protocol === "https:" ? "wss" : "ws";

@@ -4,6 +4,7 @@
   "version": "1.1.0",
   "description": "Multiplayer test relay for Danmaku IO",
   "scripts": {
+    "start": "node server.js",
     "start:server": "node server.js"
   },
   "dependencies": {
