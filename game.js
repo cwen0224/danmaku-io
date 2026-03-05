@@ -89,8 +89,8 @@ const ATTACK_MODES = [
     arcMult: 1.0,
     cooldownMult: 1.12,
     damageMult: 1.12,
-    knockbackMult: 3.0,
-    impulseMult: 3.0
+    knockbackMult: 1.0,
+    impulseMult: 1.0
   },
   {
     id: "thrust",
@@ -110,8 +110,8 @@ const ATTACK_MODES = [
     arcMult: 1.42,
     cooldownMult: 1.9,
     damageMult: 0.78,
-    knockbackMult: 3.24,
-    impulseMult: 3.6
+    knockbackMult: 1.08,
+    impulseMult: 1.2
   }
 ];
 
