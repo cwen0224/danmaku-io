@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305140750";
+const APP_VERSION = "20260305141010";
 
 const WEAPON_PRESETS = [
   {
@@ -748,10 +748,10 @@ function drawPlayer() {
 
 function drawFacingArrow(player) {
   const angle = player.facing;
-  const baseDist = CONFIG.player.radius + 8;
-  const tipDist = baseDist + 18;
-  const wingDist = tipDist - 9;
-  const wingSpread = 0.52;
+  const baseDist = CONFIG.player.radius + 9;
+  const tipDist = baseDist + 24;
+  const wingDist = tipDist - 10;
+  const wingSpread = 0.62;
 
   const baseX = player.x + Math.cos(angle) * baseDist;
   const baseY = player.y + Math.sin(angle) * baseDist;
@@ -765,8 +765,8 @@ function drawFacingArrow(player) {
   ctx.beginPath();
   ctx.moveTo(baseX, baseY);
   ctx.lineTo(tipX, tipY);
-  ctx.strokeStyle = "rgba(120, 248, 180, 0.95)";
-  ctx.lineWidth = 2.6;
+  ctx.strokeStyle = "rgba(140, 255, 190, 0.98)";
+  ctx.lineWidth = 3.6;
   ctx.lineCap = "round";
   ctx.stroke();
 
@@ -775,7 +775,7 @@ function drawFacingArrow(player) {
   ctx.lineTo(leftX, leftY);
   ctx.lineTo(rightX, rightY);
   ctx.closePath();
-  ctx.fillStyle = "rgba(164, 255, 208, 0.95)";
+  ctx.fillStyle = "rgba(190, 255, 220, 0.98)";
   ctx.fill();
 }
 
@@ -818,7 +818,9 @@ function draw() {
   }
 
   drawPlayer();
-  drawWeaponHitbox();
+  if (state.activeSlash) {
+    drawWeaponHitbox();
+  }
   ctx.restore();
 }
 
