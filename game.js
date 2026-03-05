@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305144645";
+const APP_VERSION = "20260305144847";
 
 const WEAPON_PRESETS = [
   {
@@ -437,7 +437,8 @@ function applyStun(enemy, runtime) {
   const duration =
     runtime.baseStunSec *
     (0.65 + weapon.weight / 16) *
-    (0.8 + enemy.sizeFactor * 0.25);
+    (0.8 + enemy.sizeFactor * 0.25) *
+    1.9;
   enemy.status.stunSec = Math.max(enemy.status.stunSec, duration);
 }
 
@@ -1049,6 +1050,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
