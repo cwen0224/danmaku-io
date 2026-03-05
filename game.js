@@ -14,6 +14,7 @@ const finalKillsEl = document.getElementById("final-kills");
 const WEAPON_PRESETS = [
   {
     name: "長矛",
+    bladeStartRatio: 0.88,
     length: 9.0,
     weight: 5.2,
     center: 5.6,
@@ -29,6 +30,7 @@ const WEAPON_PRESETS = [
   },
   {
     name: "大劍",
+    bladeStartRatio: 0.42,
     length: 7.1,
     weight: 7.8,
     center: 6.8,
@@ -44,6 +46,7 @@ const WEAPON_PRESETS = [
   },
   {
     name: "匕首",
+    bladeStartRatio: 0.3,
     length: 3.4,
     weight: 2.2,
     center: 4.2,
@@ -59,6 +62,7 @@ const WEAPON_PRESETS = [
   },
   {
     name: "戰槌",
+    bladeStartRatio: 0.94,
     length: 6.3,
     weight: 9.3,
     center: 7.6,
@@ -393,7 +397,8 @@ function applyStun(enemy) {
 function calculateHitEffect(enemy, hitRatio) {
   const weapon = CONFIG.weapon;
   const runtime = state.weaponRuntime;
-  const isHeadHit = hitRatio >= CONFIG.slash.headHitThreshold;
+  const bladeStartRatio = weapon.bladeStartRatio ?? CONFIG.slash.headHitThreshold;
+  const isHeadHit = hitRatio >= bladeStartRatio;
   const sharpness = isHeadHit ? weapon.headSharpness : weapon.shaftSharpness;
 
   let damage = weapon.baseDamage * runtime.damageWeightMult * runtime.damageCenterMult;
@@ -633,7 +638,8 @@ function drawWeaponHitbox() {
 
   const anchorX = player.x;
   const anchorY = player.y;
-  const headStartDistance = runtime.range * CONFIG.slash.headHitThreshold * reachScale;
+  const bladeStartRatio = CONFIG.weapon.bladeStartRatio ?? CONFIG.slash.headHitThreshold;
+  const headStartDistance = runtime.range * bladeStartRatio * reachScale;
   const tipDistance = runtime.range * reachScale;
   const headStartX = anchorX + Math.cos(angle) * headStartDistance;
   const headStartY = anchorY + Math.sin(angle) * headStartDistance;
