@@ -14,7 +14,7 @@ const finalKillsEl = document.getElementById("final-kills");
 const WEAPON_PRESETS = [
   {
     name: "長矛",
-    bladeStartRatio: 0.88,
+    bladeStartRatio: 0.95,
     length: 9.0,
     weight: 5.2,
     center: 5.6,
@@ -30,7 +30,7 @@ const WEAPON_PRESETS = [
   },
   {
     name: "大劍",
-    bladeStartRatio: 0.42,
+    bladeStartRatio: 0.26,
     length: 7.1,
     weight: 7.8,
     center: 6.8,
@@ -46,7 +46,7 @@ const WEAPON_PRESETS = [
   },
   {
     name: "匕首",
-    bladeStartRatio: 0.3,
+    bladeStartRatio: 0.22,
     length: 3.4,
     weight: 2.2,
     center: 4.2,
@@ -62,7 +62,7 @@ const WEAPON_PRESETS = [
   },
   {
     name: "戰槌",
-    bladeStartRatio: 0.94,
+    bladeStartRatio: 0.97,
     length: 6.3,
     weight: 9.3,
     center: 7.6,
