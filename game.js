@@ -35,6 +35,11 @@ const CONFIG = {
     knockbackDrag: 8.5,
     stunSlowRatio: 0.18
   },
+  world: {
+    width: 4200,
+    height: 2800,
+    cameraLerp: 12
+  },
   weapon: {
     name: "訓練長戟",
     length: 8.2,
@@ -54,7 +59,9 @@ const CONFIG = {
 
 const state = {
   mouse: { x: 0, y: 0 },
+  mouseScreen: { x: 0, y: 0 },
   player: null,
+  camera: { x: 0, y: 0 },
   enemies: [],
   elapsed: 0,
   kills: 0,
@@ -107,6 +114,39 @@ function pointSegmentInfo(point, a, b) {
   };
 }
 
+function getCameraBounds() {
+  const halfW = canvas.width * 0.5;
+  const halfH = canvas.height * 0.5;
+  return {
+    minX: halfW,
+    maxX: Math.max(halfW, CONFIG.world.width - halfW),
+    minY: halfH,
+    maxY: Math.max(halfH, CONFIG.world.height - halfH)
+  };
+}
+
+function clampCamera() {
+  const bounds = getCameraBounds();
+  state.camera.x = clamp(state.camera.x, bounds.minX, bounds.maxX);
+  state.camera.y = clamp(state.camera.y, bounds.minY, bounds.maxY);
+}
+
+function updateMouseWorld() {
+  state.mouse.x = state.camera.x + state.mouseScreen.x - canvas.width * 0.5;
+  state.mouse.y = state.camera.y + state.mouseScreen.y - canvas.height * 0.5;
+}
+
+function updateCamera(dt) {
+  const bounds = getCameraBounds();
+  const targetX = clamp(state.player.x, bounds.minX, bounds.maxX);
+  const targetY = clamp(state.player.y, bounds.minY, bounds.maxY);
+  const t = 1 - Math.exp(-CONFIG.world.cameraLerp * dt);
+  state.camera.x = lerp(state.camera.x, targetX, t);
+  state.camera.y = lerp(state.camera.y, targetY, t);
+  clampCamera();
+  updateMouseWorld();
+}
+
 function deriveWeaponRuntime() {
   const weapon = CONFIG.weapon;
   const moveMultiplier = clamp(1 - weapon.weight / 40, 0.72, 1.0);
@@ -127,8 +167,6 @@ function deriveWeaponRuntime() {
 }
 
 function resizeCanvas() {
-  const previousWidth = canvas.width || 1;
-  const previousHeight = canvas.height || 1;
   const rect = canvas.getBoundingClientRect();
   const width = Math.max(480, Math.floor(rect.width));
   const height = Math.max(270, Math.floor(rect.height));
@@ -137,42 +175,40 @@ function resizeCanvas() {
     return;
   }
 
-  const playerRatioX = state.player ? state.player.x / previousWidth : 0.5;
-  const playerRatioY = state.player ? state.player.y / previousHeight : 0.5;
-  const mouseRatioX = state.mouse.x / previousWidth;
-  const mouseRatioY = state.mouse.y / previousHeight;
-
   canvas.width = width;
   canvas.height = height;
-
   if (state.player) {
-    state.player.x = clamp(playerRatioX * width, CONFIG.player.radius, width - CONFIG.player.radius);
-    state.player.y = clamp(playerRatioY * height, CONFIG.player.radius, height - CONFIG.player.radius);
+    clampCamera();
+    updateMouseWorld();
   }
-
-  state.mouse.x = clamp(mouseRatioX * width, 0, width);
-  state.mouse.y = clamp(mouseRatioY * height, 0, height);
 }
 
 function spawnEnemy() {
   const padding = CONFIG.enemy.edgePadding;
   const edge = Math.floor(Math.random() * 4);
+  const viewLeft = state.camera.x - canvas.width * 0.5;
+  const viewRight = state.camera.x + canvas.width * 0.5;
+  const viewTop = state.camera.y - canvas.height * 0.5;
+  const viewBottom = state.camera.y + canvas.height * 0.5;
   let x = 0;
   let y = 0;
 
   if (edge === 0) {
-    x = Math.random() * canvas.width;
-    y = -padding;
+    x = lerp(viewLeft, viewRight, Math.random());
+    y = viewTop - padding;
   } else if (edge === 1) {
-    x = canvas.width + padding;
-    y = Math.random() * canvas.height;
+    x = viewRight + padding;
+    y = lerp(viewTop, viewBottom, Math.random());
   } else if (edge === 2) {
-    x = Math.random() * canvas.width;
-    y = canvas.height + padding;
+    x = lerp(viewLeft, viewRight, Math.random());
+    y = viewBottom + padding;
   } else {
-    x = -padding;
-    y = Math.random() * canvas.height;
+    x = viewLeft - padding;
+    y = lerp(viewTop, viewBottom, Math.random());
   }
+
+  x = clamp(x, padding, CONFIG.world.width - padding);
+  y = clamp(y, padding, CONFIG.world.height - padding);
 
   const intensity = 1 + (state.elapsed / 60) * CONFIG.enemy.accelPerMin;
   const roll = Math.random();
@@ -379,9 +415,10 @@ function update(dt) {
     player.y += (toMouseY / distance) * moveDistance;
   }
 
-  player.x = clamp(player.x, CONFIG.player.radius, canvas.width - CONFIG.player.radius);
-  player.y = clamp(player.y, CONFIG.player.radius, canvas.height - CONFIG.player.radius);
+  player.x = clamp(player.x, CONFIG.player.radius, CONFIG.world.width - CONFIG.player.radius);
+  player.y = clamp(player.y, CONFIG.player.radius, CONFIG.world.height - CONFIG.player.radius);
   player.facing = angleTo(player, state.mouse);
+  updateCamera(dt);
 
   const spawnInterval = Math.max(
     CONFIG.enemy.minSpawnSec,
@@ -530,8 +567,39 @@ function drawPlayer() {
   ctx.stroke();
 }
 
+function drawWorldBackground() {
+  const grid = 120;
+  const startX = Math.floor((state.camera.x - canvas.width * 0.5) / grid) * grid;
+  const endX = Math.ceil((state.camera.x + canvas.width * 0.5) / grid) * grid;
+  const startY = Math.floor((state.camera.y - canvas.height * 0.5) / grid) * grid;
+  const endY = Math.ceil((state.camera.y + canvas.height * 0.5) / grid) * grid;
+
+  ctx.strokeStyle = "rgba(120, 145, 190, 0.18)";
+  ctx.lineWidth = 1;
+  for (let x = startX; x <= endX; x += grid) {
+    ctx.beginPath();
+    ctx.moveTo(x, startY);
+    ctx.lineTo(x, endY);
+    ctx.stroke();
+  }
+  for (let y = startY; y <= endY; y += grid) {
+    ctx.beginPath();
+    ctx.moveTo(startX, y);
+    ctx.lineTo(endX, y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "rgba(70, 95, 140, 0.55)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, CONFIG.world.width, CONFIG.world.height);
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(canvas.width * 0.5 - state.camera.x, canvas.height * 0.5 - state.camera.y);
+
+  drawWorldBackground();
 
   for (const enemy of state.enemies) {
     drawEnemy(enemy);
@@ -539,6 +607,7 @@ function draw() {
 
   drawPlayer();
   drawWeaponHitbox();
+  ctx.restore();
 }
 
 function updateHud() {
@@ -554,15 +623,19 @@ function reset() {
   state.weaponRuntime = deriveWeaponRuntime();
 
   state.player = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
+    x: CONFIG.world.width * 0.5,
+    y: CONFIG.world.height * 0.5,
     hp: CONFIG.player.hp,
     invincible: 0,
     facing: 0
   };
 
-  state.mouse.x = canvas.width / 2;
-  state.mouse.y = canvas.height / 2;
+  state.camera.x = state.player.x;
+  state.camera.y = state.player.y;
+  clampCamera();
+  state.mouseScreen.x = canvas.width * 0.5;
+  state.mouseScreen.y = canvas.height * 0.5;
+  updateMouseWorld();
   state.enemies = [];
   state.elapsed = 0;
   state.kills = 0;
@@ -590,8 +663,9 @@ function tick(ts) {
 
 canvas.addEventListener("mousemove", (event) => {
   const rect = canvas.getBoundingClientRect();
-  state.mouse.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  state.mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  state.mouseScreen.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
+  state.mouseScreen.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  updateMouseWorld();
 });
 
 window.addEventListener("resize", resizeCanvas);
