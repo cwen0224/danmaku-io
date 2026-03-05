@@ -97,8 +97,8 @@ const ATTACK_MODES = [
     arcMult: 0.36,
     cooldownMult: 0.62,
     damageMult: 1.12,
-    knockbackMult: 0.85,
-    impulseMult: 1.05
+    knockbackMult: 1.35,
+    impulseMult: 2.1
   },
   {
     id: "breaker",
