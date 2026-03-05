@@ -64,6 +64,7 @@ const ATTACK_MODES = [
     id: "sweep",
     name: "橫掃",
     rangeMult: 1.0,
+    arcOverride: (Math.PI * 2) / 3,
     arcMult: 1.0,
     cooldownMult: 1.0,
     damageMult: 1.0,
@@ -236,13 +237,10 @@ function cycleAttackMode() {
 function deriveWeaponRuntime() {
   const weapon = CONFIG.weapon;
   const mode = ATTACK_MODES[state.attackModeIndex];
-  const moveMultiplier = clamp(1 - weapon.weight / 40, 0.72, 1.0);
+  const moveMultiplier = clamp(1 - weapon.weight / 16, 0.45, 1.0);
   const range = (54 + weapon.length * 9) * mode.rangeMult;
-  const arc = clamp(
-    (CONFIG.slash.baseArc + (weapon.length - 5.5) * 0.02) * mode.arcMult,
-    Math.PI * 0.18,
-    Math.PI * 0.95
-  );
+  const computedArc = (CONFIG.slash.baseArc + (weapon.length - 5.5) * 0.02) * mode.arcMult;
+  const arc = clamp(mode.arcOverride ?? computedArc, Math.PI * 0.18, Math.PI * 0.95);
   const cooldown = clamp(
     weapon.baseCooldown * (1 - (weapon.center - 5.5) * 0.03) * mode.cooldownMult,
     0.14,
@@ -733,7 +731,7 @@ function updateHud() {
   hpEl.textContent = String(Math.max(0, Math.ceil(state.player.hp)));
   killsEl.textContent = String(state.kills);
   timeEl.textContent = state.elapsed.toFixed(1);
-  weaponEl.textContent = CONFIG.weapon.name;
+  weaponEl.textContent = `${CONFIG.weapon.name} (${Math.round(state.weaponRuntime.moveMultiplier * 100)}%速)`;
   slashModeEl.textContent = `${mode.name} / ${state.lastHitLabel}`;
 }
 
