@@ -6,12 +6,13 @@ const killsEl = document.getElementById("kills");
 const timeEl = document.getElementById("time");
 const weaponEl = document.getElementById("weapon");
 const slashModeEl = document.getElementById("slash-mode");
+const netStatusEl = document.getElementById("net-status");
 const versionBadgeEl = document.getElementById("version-badge");
 const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305151502";
+const APP_VERSION = "20260305154902";
 
 const WEAPON_PRESETS = [
   {
@@ -128,6 +129,9 @@ const CONFIG = {
   }
 };
 
+const NETWORK_SEND_INTERVAL_SEC = 0.066;
+const NETWORK_STALE_SEC = 4;
+
 const state = {
   mouse: { x: 0, y: 0 },
   mouseScreen: { x: 0, y: 0 },
@@ -148,7 +152,16 @@ const state = {
   weaponRuntime: null,
   lastHitLabel: "待命",
   slashDirection: 1,
-  activeSlash: null
+  activeSlash: null,
+  remotePlayers: new Map(),
+  network: {
+    enabled: false,
+    status: "離線",
+    url: "",
+    ws: null,
+    localId: "",
+    sendTimer: 0
+  }
 };
 
 function clamp(value, min, max) {
@@ -169,6 +182,159 @@ function angleDiff(a, b) {
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
+}
+
+function getMultiplayerUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("mp") || params.get("ws");
+  if (!raw) {
+    return "";
+  }
+  if (raw === "1" || raw === "on") {
+    const wsProto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${wsProto}://${window.location.hostname}:8080`;
+  }
+  return raw;
+}
+
+function setNetworkStatus(text) {
+  state.network.status = text;
+  if (netStatusEl) {
+    netStatusEl.textContent = text;
+  }
+}
+
+function upsertRemotePeer(peerState) {
+  if (!peerState || !peerState.id || peerState.id === state.network.localId) {
+    return;
+  }
+  const existing = state.remotePlayers.get(peerState.id);
+  const next = {
+    id: peerState.id,
+    x: Number(peerState.x) || 0,
+    y: Number(peerState.y) || 0,
+    tx: Number(peerState.x) || 0,
+    ty: Number(peerState.y) || 0,
+    facing: Number(peerState.facing) || 0,
+    hp: Number(peerState.hp) || 0,
+    weapon: String(peerState.weapon || "未知"),
+    t: Number(peerState.t) || Date.now()
+  };
+
+  if (existing) {
+    next.x = existing.x;
+    next.y = existing.y;
+    next.tx = Number(peerState.x) || existing.tx;
+    next.ty = Number(peerState.y) || existing.ty;
+  }
+
+  state.remotePlayers.set(next.id, next);
+}
+
+function setupMultiplayer() {
+  const url = getMultiplayerUrl();
+  if (!url) {
+    setNetworkStatus("離線");
+    return;
+  }
+
+  state.network.enabled = true;
+  state.network.url = url;
+  setNetworkStatus("連線中");
+
+  let ws;
+  try {
+    ws = new WebSocket(url);
+  } catch {
+    setNetworkStatus("連線失敗");
+    return;
+  }
+
+  state.network.ws = ws;
+
+  ws.addEventListener("open", () => {
+    setNetworkStatus("已連線(0)");
+  });
+
+  ws.addEventListener("close", () => {
+    state.network.ws = null;
+    state.network.localId = "";
+    state.remotePlayers.clear();
+    setNetworkStatus("連線中斷");
+  });
+
+  ws.addEventListener("error", () => {
+    setNetworkStatus("連線錯誤");
+  });
+
+  ws.addEventListener("message", (event) => {
+    let msg;
+    try {
+      msg = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+
+    if (!msg || !msg.type) {
+      return;
+    }
+
+    if (msg.type === "welcome") {
+      state.network.localId = String(msg.id || "");
+      state.remotePlayers.clear();
+      const peers = Array.isArray(msg.peers) ? msg.peers : [];
+      for (const p of peers) {
+        upsertRemotePeer(p);
+      }
+    } else if (msg.type === "peer_join" || msg.type === "peer_state") {
+      upsertRemotePeer(msg.peer);
+    } else if (msg.type === "peer_leave" && msg.id) {
+      state.remotePlayers.delete(String(msg.id));
+    }
+
+    if (state.network.enabled) {
+      setNetworkStatus(`已連線(${state.remotePlayers.size})`);
+    }
+  });
+}
+
+function updateMultiplayer(dt) {
+  if (!state.network.enabled || !state.network.ws || !state.player) {
+    return;
+  }
+
+  for (const [id, peer] of state.remotePlayers) {
+    if (Date.now() - peer.t > NETWORK_STALE_SEC * 1000) {
+      state.remotePlayers.delete(id);
+      continue;
+    }
+    const t = 1 - Math.exp(-12 * dt);
+    peer.x = lerp(peer.x, peer.tx, t);
+    peer.y = lerp(peer.y, peer.ty, t);
+  }
+
+  if (state.network.ws.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  state.network.sendTimer += dt;
+  if (state.network.sendTimer < NETWORK_SEND_INTERVAL_SEC) {
+    return;
+  }
+  state.network.sendTimer = 0;
+
+  state.network.ws.send(
+    JSON.stringify({
+      type: "state",
+      state: {
+        x: state.player.x,
+        y: state.player.y,
+        facing: state.player.facing,
+        hp: state.player.hp,
+        weapon: CONFIG.weapon.name
+      }
+    })
+  );
 }
 
 function pointSegmentInfo(point, a, b) {
@@ -839,6 +1005,7 @@ function update(dt) {
 
   updateDeathParticles(dt);
   updateBlinkEffects(dt);
+  updateMultiplayer(dt);
 
   if (player.hp <= 0) {
     state.running = false;
@@ -996,6 +1163,24 @@ function drawEnemy(enemy) {
   ctx.fill();
 }
 
+function drawRemotePlayer(peer) {
+  ctx.beginPath();
+  ctx.arc(peer.x, peer.y, CONFIG.player.radius, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(136, 198, 255, 0.78)";
+  ctx.fill();
+
+  drawFacingArrow({
+    x: peer.x,
+    y: peer.y,
+    facing: peer.facing
+  });
+
+  ctx.fillStyle = "rgba(188, 225, 255, 0.95)";
+  ctx.font = "12px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(peer.weapon, peer.x, peer.y - CONFIG.player.radius - 12);
+}
+
 function drawPlayer() {
   const player = state.player;
 
@@ -1077,6 +1262,9 @@ function draw() {
   for (const enemy of state.enemies) {
     drawEnemy(enemy);
   }
+  for (const peer of state.remotePlayers.values()) {
+    drawRemotePlayer(peer);
+  }
   drawBlinkEffects();
   drawDeathParticles();
 
@@ -1096,6 +1284,13 @@ function updateHud() {
   timeEl.textContent = state.elapsed.toFixed(1);
   weaponEl.textContent = `${w.name} [${statsText}]`;
   slashModeEl.textContent = `${mode.name} / ${state.lastHitLabel}`;
+  if (netStatusEl) {
+    if (state.network.enabled && state.network.ws && state.network.ws.readyState === WebSocket.OPEN) {
+      netStatusEl.textContent = `已連線(${state.remotePlayers.size})`;
+    } else {
+      netStatusEl.textContent = state.network.status;
+    }
+  }
 }
 
 function reset() {
@@ -1130,6 +1325,7 @@ function reset() {
   state.lastHitLabel = "待命";
   state.slashDirection = 1;
   state.activeSlash = null;
+  state.network.sendTimer = 0;
   overlay.classList.add("hidden");
   updateHud();
 }
@@ -1173,10 +1369,16 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("resize", resizeCanvas);
 restartBtn.addEventListener("click", reset);
+window.addEventListener("beforeunload", () => {
+  if (state.network.ws) {
+    state.network.ws.close();
+  }
+});
 if (versionBadgeEl) {
   versionBadgeEl.textContent = `v${APP_VERSION}`;
 }
 
+setupMultiplayer();
 reset();
 requestAnimationFrame(tick);
 

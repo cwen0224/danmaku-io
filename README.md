@@ -10,6 +10,21 @@
 ## 本機執行
 直接打開 `index.html` 即可。
 
+## V1.1 連機測試（WebSocket）
+1. 安裝依賴：
+```bash
+npm install
+```
+2. 啟動 relay server：
+```bash
+npm run start:server
+```
+3. 開兩個瀏覽器視窗（或兩台電腦）連到同一個 server：
+```text
+index.html?mp=ws://localhost:8080
+```
+4. 畫面上方 `連線` 會顯示 `已連線(n)`，並看到其他玩家位置與朝向。
+
 ## 部署到 GitHub Pages
 
 1. 在 GitHub 建立新 repo（例如 `danmaku-io`）。

@@ -18,6 +18,7 @@
       <div class="hud-item">時間: <span id="time">0.0</span>s</div>
       <div class="hud-item">武器: <span id="weapon">長矛</span></div>
       <div class="hud-item">斬擊: <span id="slash-mode">待命</span></div>
+      <div class="hud-item">連線: <span id="net-status">離線</span></div>
     </header>
 
     <canvas id="game" aria-label="彈幕IO遊戲畫面"></canvas>
@@ -32,7 +33,7 @@
 
   <script>
     (function loadGameWithVersion() {
-      const fallbackVersion = "20260305151502";
+      const fallbackVersion = "20260305154902";
       const vUrl = `version.json?ts=${Date.now()}`;
       fetch(vUrl, { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error("version fetch failed"))))
