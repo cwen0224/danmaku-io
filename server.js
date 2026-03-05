@@ -449,6 +449,19 @@ wss.on("connection", (ws) => {
         t: Date.now()
       };
       broadcast({ type: "peer_state", peer: current.state }, id);
+    } else if (message.type === "respawn") {
+      const sx = message.state ? Number(message.state.x) : WORLD.width * 0.5;
+      const sy = message.state ? Number(message.state.y) : WORLD.height * 0.5;
+      current.state = {
+        ...current.state,
+        x: clamp(Number.isFinite(sx) ? sx : WORLD.width * 0.5, PLAYER_RADIUS, WORLD.width - PLAYER_RADIUS),
+        y: clamp(Number.isFinite(sy) ? sy : WORLD.height * 0.5, PLAYER_RADIUS, WORLD.height - PLAYER_RADIUS),
+        hp: 100,
+        invincible: 0.6,
+        t: Date.now()
+      };
+      safeSend(current.ws, { type: "world", enemies: worldPayload(), you: { hp: current.state.hp } });
+      broadcast({ type: "peer_state", peer: current.state }, id);
     } else if (message.type === "attack" && message.attack) {
       processPlayerAttack(current, message.attack);
     }

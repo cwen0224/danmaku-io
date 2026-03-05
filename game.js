@@ -12,7 +12,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305162110";
+const APP_VERSION = "20260305162524";
 
 const WEAPON_PRESETS = [
   {
@@ -212,6 +212,20 @@ function setNetworkStatus(text) {
   }
 }
 
+function sendRespawnToServer() {
+  if (!state.network.enabled || !state.network.ws || state.network.ws.readyState !== WebSocket.OPEN) {
+    return;
+  }
+  const x = state.player ? state.player.x : CONFIG.world.width * 0.5;
+  const y = state.player ? state.player.y : CONFIG.world.height * 0.5;
+  state.network.ws.send(
+    JSON.stringify({
+      type: "respawn",
+      state: { x, y }
+    })
+  );
+}
+
 function upsertRemotePeer(peerState) {
   if (!peerState || !peerState.id || peerState.id === state.network.localId) {
     return;
@@ -298,6 +312,7 @@ function setupMultiplayer() {
       for (const p of peers) {
         upsertRemotePeer(p);
       }
+      sendRespawnToServer();
     } else if (msg.type === "peer_join" || msg.type === "peer_state") {
       upsertRemotePeer(msg.peer);
     } else if (msg.type === "peer_attack" && msg.id) {
@@ -1497,6 +1512,7 @@ function reset() {
   state.activeSlash = null;
   state.network.sendTimer = 0;
   overlay.classList.add("hidden");
+  sendRespawnToServer();
   updateHud();
 }
 
