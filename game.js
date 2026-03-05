@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305144438";
+const APP_VERSION = "20260305144645";
 
 const WEAPON_PRESETS = [
   {
@@ -968,10 +968,12 @@ function draw() {
 
 function updateHud() {
   const mode = ATTACK_MODES[state.attackModeIndex];
+  const w = CONFIG.weapon;
+  const statsText = `L${w.length.toFixed(1)} W${w.weight.toFixed(1)} C${w.center.toFixed(1)} S${w.headSharpness.toFixed(1)}|${w.shaftSharpness.toFixed(1)}`;
   hpEl.textContent = String(Math.max(0, Math.ceil(state.player.hp)));
   killsEl.textContent = String(state.kills);
   timeEl.textContent = state.elapsed.toFixed(1);
-  weaponEl.textContent = `${CONFIG.weapon.name} (${Math.round(state.weaponRuntime.moveMultiplier * 100)}%移速 / ${state.weaponRuntime.cooldown.toFixed(2)}s攻速)`;
+  weaponEl.textContent = `${w.name} [${statsText}]`;
   slashModeEl.textContent = `${mode.name} / ${state.lastHitLabel}`;
 }
 
@@ -1047,6 +1049,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
