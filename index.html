@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>彈幕IO</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="hud">
+      <div class="hud-item">HP: <span id="hp">100</span></div>
+      <div class="hud-item">擊殺: <span id="kills">0</span></div>
+      <div class="hud-item">時間: <span id="time">0.0</span>s</div>
+    </header>
+
+    <canvas id="game" width="960" height="540" aria-label="彈幕IO遊戲畫面"></canvas>
+
+    <section id="overlay" class="overlay hidden">
+      <h1>遊戲結束</h1>
+      <p>存活：<span id="final-time">0.0</span>s</p>
+      <p>擊殺：<span id="final-kills">0</span></p>
+      <button id="restart">再玩一次</button>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
