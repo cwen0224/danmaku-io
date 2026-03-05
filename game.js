@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305143307";
+const APP_VERSION = "20260305144438";
 
 const WEAPON_PRESETS = [
   {
@@ -455,7 +455,7 @@ function calculateHitEffect(enemy, hitRatio) {
   if (sharpness >= 7) {
     const sharpBonus = 1 + (sharpness - 7) * 0.14;
     damage *= sharpBonus;
-    knockback *= 1.1;
+    knockback *= 1.6;
     applyBleed(enemy, sharpness, runtime);
     hitLabel = "利刃";
   } else if (sharpness <= 3) {
@@ -1047,5 +1047,6 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
