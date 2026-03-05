@@ -422,6 +422,7 @@ function startSlash() {
   state.activeSlash = {
     progress: 0,
     direction,
+    centerAngle: facing,
     startAngle,
     endAngle,
     currentAngle: startAngle,
@@ -593,18 +594,26 @@ function drawWeaponHitbox() {
   const player = state.player;
   const runtime = state.weaponRuntime;
   const slash = state.activeSlash;
+  const mode = ATTACK_MODES[state.attackModeIndex];
+  const isThrustMode = mode.id === "thrust";
   const idleReady = clamp(state.slashTimer / runtime.cooldown, 0, 1);
-  const angle = slash ? slash.currentAngle : player.facing;
+  const angle = slash
+    ? (isThrustMode ? slash.centerAngle : slash.currentAngle)
+    : player.facing;
+  const thrustPunch = slash && isThrustMode ? Math.sin(slash.progress * Math.PI) : 0;
+  const thrustOffset = runtime.range * 0.32 * thrustPunch;
+  const anchorX = player.x + Math.cos(angle) * thrustOffset;
+  const anchorY = player.y + Math.sin(angle) * thrustOffset;
   const headStartDistance = runtime.range * CONFIG.slash.headHitThreshold;
-  const headStartX = player.x + Math.cos(angle) * headStartDistance;
-  const headStartY = player.y + Math.sin(angle) * headStartDistance;
-  const tipX = player.x + Math.cos(angle) * runtime.range;
-  const tipY = player.y + Math.sin(angle) * runtime.range;
+  const headStartX = anchorX + Math.cos(angle) * headStartDistance;
+  const headStartY = anchorY + Math.sin(angle) * headStartDistance;
+  const tipX = anchorX + Math.cos(angle) * runtime.range;
+  const tipY = anchorY + Math.sin(angle) * runtime.range;
   const coreWidth = slash ? CONFIG.slash.hitboxRadius * 1.9 : 7 + idleReady * 4;
   const shaftColor = slash ? "rgba(209, 168, 112, 0.96)" : "rgba(170, 132, 82, 0.8)";
   const bladeColor = slash ? "rgba(225, 248, 255, 0.98)" : "rgba(166, 205, 220, 0.9)";
 
-  if (slash) {
+  if (slash && !isThrustMode) {
     ctx.beginPath();
     ctx.arc(
       player.x,
@@ -620,8 +629,20 @@ function drawWeaponHitbox() {
     ctx.stroke();
   }
 
+  if (slash && isThrustMode) {
+    const trailTipX = player.x + Math.cos(angle) * runtime.range;
+    const trailTipY = player.y + Math.sin(angle) * runtime.range;
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
+    ctx.lineTo(trailTipX, trailTipY);
+    ctx.strokeStyle = "rgba(180, 230, 245, 0.2)";
+    ctx.lineWidth = CONFIG.slash.hitboxRadius;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
+
   ctx.beginPath();
-  ctx.moveTo(player.x, player.y);
+  ctx.moveTo(anchorX, anchorY);
   ctx.lineTo(headStartX, headStartY);
   ctx.strokeStyle = shaftColor;
   ctx.lineWidth = coreWidth;
