@@ -12,7 +12,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305155620";
+const APP_VERSION = "20260305155809";
 
 const WEAPON_PRESETS = [
   {
