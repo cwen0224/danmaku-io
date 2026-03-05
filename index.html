@@ -36,7 +36,7 @@
   </script>
   <script>
     (function loadGameWithVersion() {
-      const fallbackVersion = "20260305161258";
+      const fallbackVersion = "20260305161726";
       const vUrl = `version.json?ts=${Date.now()}`;
       fetch(vUrl, { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error("version fetch failed"))))

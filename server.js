@@ -7,9 +7,9 @@ const DT = 1 / TICK_RATE;
 const WORLD = { width: 4200, height: 2800 };
 const PLAYER_RADIUS = 14;
 const ENEMY = {
-  spawnSec: 0.72,
-  minSpawnSec: 0.2,
-  accelPerMin: 0.24,
+  spawnSec: 1.2,
+  minSpawnSec: 0.45,
+  accelPerMin: 0.16,
   edgePadding: 30,
   knockbackDrag: 8.5,
   stunSlowRatio: 0.18,
@@ -112,18 +112,18 @@ function spawnEnemy() {
   const roll = Math.random();
   let radius = 12;
   let speedBase = 86;
-  let hpBase = 90;
+  let hpBase = 160;
   let sizeFactor = 0.25;
 
   if (roll > 0.9) {
     radius = 22;
     speedBase = 62;
-    hpBase = 190;
+    hpBase = 360;
     sizeFactor = 1.2;
   } else if (roll > 0.62) {
     radius = 17;
     speedBase = 74;
-    hpBase = 130;
+    hpBase = 240;
     sizeFactor = 0.7;
   }
 
