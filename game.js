@@ -62,7 +62,7 @@ const WEAPON_PRESETS = [
 const ATTACK_MODES = [
   {
     id: "sweep",
-    name: "橫掃",
+    name: "劈砍",
     rangeMult: 1.0,
     arcOverride: (Math.PI * 2) / 3,
     arcMult: 1.0,
@@ -83,8 +83,9 @@ const ATTACK_MODES = [
   },
   {
     id: "breaker",
-    name: "重擊",
+    name: "橫掃",
     rangeMult: 0.86,
+    arcOverride: Math.PI * 2,
     arcMult: 1.42,
     cooldownMult: 1.35,
     damageMult: 1.26,
@@ -240,7 +241,7 @@ function deriveWeaponRuntime() {
   const moveMultiplier = clamp(1 - weapon.weight / 16, 0.45, 1.0);
   const range = (54 + weapon.length * 9) * mode.rangeMult;
   const computedArc = (CONFIG.slash.baseArc + (weapon.length - 5.5) * 0.02) * mode.arcMult;
-  const arc = clamp(mode.arcOverride ?? computedArc, Math.PI * 0.18, Math.PI * 0.95);
+  const arc = clamp(mode.arcOverride ?? computedArc, Math.PI * 0.18, Math.PI * 2);
   const cooldown = clamp(
     weapon.baseCooldown * (1 - (weapon.center - 5.5) * 0.03) * mode.cooldownMult,
     0.14,
