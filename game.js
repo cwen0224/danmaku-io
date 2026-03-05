@@ -11,6 +11,87 @@ const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
 
+const WEAPON_PRESETS = [
+  {
+    name: "長矛",
+    length: 9.0,
+    weight: 5.2,
+    center: 5.6,
+    headSharpness: 9.4,
+    shaftSharpness: 1.2,
+    baseDamage: 20,
+    baseKnockback: 110,
+    baseCooldown: 0.27,
+    bleedChanceBase: 0.16,
+    bleedDpsBase: 7,
+    bleedDuration: 2.6,
+    baseStunSec: 0.1
+  },
+  {
+    name: "大劍",
+    length: 7.1,
+    weight: 7.8,
+    center: 6.8,
+    headSharpness: 8.3,
+    shaftSharpness: 7.7,
+    baseDamage: 29,
+    baseKnockback: 92,
+    baseCooldown: 0.33,
+    bleedChanceBase: 0.12,
+    bleedDpsBase: 6.5,
+    bleedDuration: 2.2,
+    baseStunSec: 0.08
+  },
+  {
+    name: "戰槌",
+    length: 6.3,
+    weight: 9.3,
+    center: 7.6,
+    headSharpness: 1.4,
+    shaftSharpness: 1.0,
+    baseDamage: 32,
+    baseKnockback: 165,
+    baseCooldown: 0.41,
+    bleedChanceBase: 0.03,
+    bleedDpsBase: 4.5,
+    bleedDuration: 1.6,
+    baseStunSec: 0.16
+  }
+];
+
+const ATTACK_MODES = [
+  {
+    id: "sweep",
+    name: "橫掃",
+    rangeMult: 1.0,
+    arcMult: 1.0,
+    cooldownMult: 1.0,
+    damageMult: 1.0,
+    knockbackMult: 1.0,
+    impulseMult: 1.0
+  },
+  {
+    id: "thrust",
+    name: "突刺",
+    rangeMult: 1.26,
+    arcMult: 0.36,
+    cooldownMult: 0.78,
+    damageMult: 1.12,
+    knockbackMult: 0.85,
+    impulseMult: 1.05
+  },
+  {
+    id: "breaker",
+    name: "重擊",
+    rangeMult: 0.86,
+    arcMult: 1.42,
+    cooldownMult: 1.35,
+    damageMult: 1.26,
+    knockbackMult: 1.5,
+    impulseMult: 1.75
+  }
+];
+
 const CONFIG = {
   player: {
     radius: 14,
@@ -41,19 +122,7 @@ const CONFIG = {
     cameraLerp: 12
   },
   weapon: {
-    name: "長矛",
-    length: 9.0,
-    weight: 5.2,
-    center: 5.6,
-    headSharpness: 9.4,
-    shaftSharpness: 1.2,
-    baseDamage: 20,
-    baseKnockback: 110,
-    baseCooldown: 0.27,
-    bleedChanceBase: 0.16,
-    bleedDpsBase: 7,
-    bleedDuration: 2.6,
-    baseStunSec: 0.1
+    ...WEAPON_PRESETS[0]
   }
 };
 
@@ -69,6 +138,8 @@ const state = {
   slashTimer: 0,
   running: true,
   lastTs: 0,
+  weaponIndex: 0,
+  attackModeIndex: 0,
   weaponRuntime: null,
   lastHitLabel: "待命",
   slashDirection: 1,
@@ -147,12 +218,36 @@ function updateCamera(dt) {
   updateMouseWorld();
 }
 
+function cycleWeapon() {
+  state.weaponIndex = (state.weaponIndex + 1) % WEAPON_PRESETS.length;
+  Object.assign(CONFIG.weapon, WEAPON_PRESETS[state.weaponIndex]);
+  state.weaponRuntime = deriveWeaponRuntime();
+  state.lastHitLabel = "切換武器";
+  updateHud();
+}
+
+function cycleAttackMode() {
+  state.attackModeIndex = (state.attackModeIndex + 1) % ATTACK_MODES.length;
+  state.weaponRuntime = deriveWeaponRuntime();
+  state.lastHitLabel = "切換模式";
+  updateHud();
+}
+
 function deriveWeaponRuntime() {
   const weapon = CONFIG.weapon;
+  const mode = ATTACK_MODES[state.attackModeIndex];
   const moveMultiplier = clamp(1 - weapon.weight / 40, 0.72, 1.0);
-  const range = 54 + weapon.length * 9;
-  const arc = clamp(CONFIG.slash.baseArc + (weapon.length - 5.5) * 0.02, Math.PI * 0.4, Math.PI * 0.7);
-  const cooldown = clamp(weapon.baseCooldown * (1 - (weapon.center - 5.5) * 0.03), 0.18, 0.52);
+  const range = (54 + weapon.length * 9) * mode.rangeMult;
+  const arc = clamp(
+    (CONFIG.slash.baseArc + (weapon.length - 5.5) * 0.02) * mode.arcMult,
+    Math.PI * 0.18,
+    Math.PI * 0.95
+  );
+  const cooldown = clamp(
+    weapon.baseCooldown * (1 - (weapon.center - 5.5) * 0.03) * mode.cooldownMult,
+    0.14,
+    0.7
+  );
   const damageWeightMult = 1 + weapon.weight / 20;
   const damageCenterMult = 1 + (weapon.center - 5.5) / 15;
 
@@ -162,7 +257,10 @@ function deriveWeaponRuntime() {
     arc,
     cooldown,
     damageWeightMult,
-    damageCenterMult
+    damageCenterMult,
+    damageModeMult: mode.damageMult,
+    knockbackModeMult: mode.knockbackMult,
+    impulseModeMult: mode.impulseMult
   };
 }
 
@@ -303,6 +401,8 @@ function calculateHitEffect(enemy, hitRatio) {
   }
 
   knockback *= 1 / (1 + enemy.sizeFactor);
+  damage *= runtime.damageModeMult;
+  knockback *= runtime.knockbackModeMult;
 
   return {
     damage,
@@ -365,8 +465,8 @@ function applySlashHitbox(slashAngle, hitEnemyIds) {
 
     enemy.x += pushX * effect.knockback * CONFIG.slash.visualKnockbackScale;
     enemy.y += pushY * effect.knockback * CONFIG.slash.visualKnockbackScale;
-    enemy.vx += pushX * effect.knockback * CONFIG.slash.knockbackImpulseScale;
-    enemy.vy += pushY * effect.knockback * CONFIG.slash.knockbackImpulseScale;
+    enemy.vx += pushX * effect.knockback * CONFIG.slash.knockbackImpulseScale * runtime.impulseModeMult;
+    enemy.vy += pushY * effect.knockback * CONFIG.slash.knockbackImpulseScale * runtime.impulseModeMult;
 
     state.lastHitLabel = effect.hitLabel;
     hitEnemyIds.add(enemy);
@@ -629,15 +729,17 @@ function draw() {
 }
 
 function updateHud() {
+  const mode = ATTACK_MODES[state.attackModeIndex];
   hpEl.textContent = String(Math.max(0, Math.ceil(state.player.hp)));
   killsEl.textContent = String(state.kills);
   timeEl.textContent = state.elapsed.toFixed(1);
   weaponEl.textContent = CONFIG.weapon.name;
-  slashModeEl.textContent = state.lastHitLabel;
+  slashModeEl.textContent = `${mode.name} / ${state.lastHitLabel}`;
 }
 
 function reset() {
   resizeCanvas();
+  Object.assign(CONFIG.weapon, WEAPON_PRESETS[state.weaponIndex]);
   state.weaponRuntime = deriveWeaponRuntime();
 
   state.player = {
@@ -684,6 +786,18 @@ canvas.addEventListener("mousemove", (event) => {
   state.mouseScreen.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
   state.mouseScreen.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
   updateMouseWorld();
+});
+
+canvas.addEventListener("mousedown", (event) => {
+  if (event.button === 0) {
+    cycleWeapon();
+  } else if (event.button === 2) {
+    cycleAttackMode();
+  }
+});
+
+canvas.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
 });
 
 window.addEventListener("resize", resizeCanvas);
