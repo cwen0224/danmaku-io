@@ -2,7 +2,8 @@ const http = require("http");
 const { WebSocketServer } = require("ws");
 
 const PORT = Number(process.env.PORT || 8080);
-const TICK_RATE = 20;
+const TICK_RATE = 15;
+const WORLD_BROADCAST_RATE = 10;
 const DT = 1 / TICK_RATE;
 const WORLD = { width: 4200, height: 2800 };
 const PLAYER_RADIUS = 14;
@@ -10,7 +11,7 @@ const ENEMY = {
   spawnSec: 1.2,
   minSpawnSec: 0.45,
   accelPerMin: 0.16,
-  maxCount: 120,
+  maxCount: 80,
   edgePadding: 30,
   knockbackDrag: 8.5,
   stunSlowRatio: 0.18,
@@ -370,16 +371,11 @@ function worldPayload() {
     vx: enemy.vx,
     vy: enemy.vy,
     radius: enemy.radius,
-    speed: enemy.speed,
     sizeFactor: enemy.sizeFactor,
     facing: enemy.facing,
     weaponRange: enemy.weaponRange,
-    weaponCooldown: enemy.weaponCooldown,
     weaponDamage: enemy.weaponDamage,
-    weaponSwingSec: enemy.weaponSwingSec,
-    attackTimer: enemy.attackTimer,
     attackState: enemy.attackState,
-    hp: enemy.hp,
     hitFlash: enemy.hitFlash,
     status: enemy.status
   }));
@@ -474,8 +470,15 @@ wss.on("connection", (ws) => {
   ws.on("error", () => ws.close());
 });
 
+let tickCounter = 0;
+const worldSendEveryTicks = Math.max(1, Math.round(TICK_RATE / WORLD_BROADCAST_RATE));
+
 setInterval(() => {
   updateWorld(DT);
+  tickCounter += 1;
+  if (tickCounter % worldSendEveryTicks !== 0) {
+    return;
+  }
   const enemiesSnapshot = worldPayload();
   for (const peer of peers.values()) {
     safeSend(peer.ws, {

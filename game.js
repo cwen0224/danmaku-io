@@ -12,7 +12,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305162524";
+const APP_VERSION = "20260305163202";
 
 const WEAPON_PRESETS = [
   {
@@ -132,6 +132,7 @@ const CONFIG = {
 
 const NETWORK_SEND_INTERVAL_SEC = 0.066;
 const NETWORK_STALE_SEC = 4;
+const ENEMY_CULL_MARGIN = 140;
 
 const state = {
   mouse: { x: 0, y: 0 },
@@ -154,6 +155,7 @@ const state = {
   lastHitLabel: "待命",
   slashDirection: 1,
   activeSlash: null,
+  enemyById: new Map(),
   remotePlayers: new Map(),
   network: {
     enabled: false,
@@ -224,6 +226,62 @@ function sendRespawnToServer() {
       state: { x, y }
     })
   );
+}
+
+function applyWorldEnemies(enemiesPayload) {
+  const seen = new Set();
+  for (const enemy of enemiesPayload) {
+    const id = String(enemy.id || "");
+    if (!id) {
+      continue;
+    }
+    seen.add(id);
+    const existing = state.enemyById.get(id);
+    if (existing) {
+      existing.x = Number(enemy.x) || 0;
+      existing.y = Number(enemy.y) || 0;
+      existing.vx = Number(enemy.vx) || 0;
+      existing.vy = Number(enemy.vy) || 0;
+      existing.radius = Number(enemy.radius) || 12;
+      existing.sizeFactor = Number(enemy.sizeFactor) || 0.25;
+      existing.facing = Number(enemy.facing) || 0;
+      existing.weaponRange = Number(enemy.weaponRange) || 36;
+      existing.weaponDamage = Number(enemy.weaponDamage) || 4;
+      existing.attackState = enemy.attackState || null;
+      existing.hitFlash = Number(enemy.hitFlash) || 0;
+      existing.status = enemy.status || { bleedSec: 0, bleedDps: 0, stunSec: 0 };
+      continue;
+    }
+
+    state.enemyById.set(id, {
+      id,
+      x: Number(enemy.x) || 0,
+      y: Number(enemy.y) || 0,
+      vx: Number(enemy.vx) || 0,
+      vy: Number(enemy.vy) || 0,
+      radius: Number(enemy.radius) || 12,
+      speed: 0,
+      sizeFactor: Number(enemy.sizeFactor) || 0.25,
+      facing: Number(enemy.facing) || 0,
+      weaponRange: Number(enemy.weaponRange) || 36,
+      weaponCooldown: 1.3,
+      weaponDamage: Number(enemy.weaponDamage) || 4,
+      weaponSwingSec: 0.34,
+      attackTimer: 0,
+      attackState: enemy.attackState || null,
+      hp: 1,
+      hitFlash: Number(enemy.hitFlash) || 0,
+      status: enemy.status || { bleedSec: 0, bleedDps: 0, stunSec: 0 }
+    });
+  }
+
+  for (const id of state.enemyById.keys()) {
+    if (!seen.has(id)) {
+      state.enemyById.delete(id);
+    }
+  }
+
+  state.enemies = Array.from(state.enemyById.values());
 }
 
 function upsertRemotePeer(peerState) {
@@ -331,26 +389,7 @@ function setupMultiplayer() {
         state.player.hp = Number(msg.you.hp);
       }
       if (Array.isArray(msg.enemies)) {
-        state.enemies = msg.enemies.map((enemy) => ({
-          id: String(enemy.id || ""),
-          x: Number(enemy.x) || 0,
-          y: Number(enemy.y) || 0,
-          vx: Number(enemy.vx) || 0,
-          vy: Number(enemy.vy) || 0,
-          radius: Number(enemy.radius) || 12,
-          speed: Number(enemy.speed) || 0,
-          sizeFactor: Number(enemy.sizeFactor) || 0.25,
-          facing: Number(enemy.facing) || 0,
-          weaponRange: Number(enemy.weaponRange) || 36,
-          weaponCooldown: Number(enemy.weaponCooldown) || 1.3,
-          weaponDamage: Number(enemy.weaponDamage) || 4,
-          weaponSwingSec: Number(enemy.weaponSwingSec) || 0.34,
-          attackTimer: Number(enemy.attackTimer) || 0,
-          attackState: enemy.attackState || null,
-          hp: Number(enemy.hp) || 1,
-          hitFlash: Number(enemy.hitFlash) || 0,
-          status: enemy.status || { bleedSec: 0, bleedDps: 0, stunSec: 0 }
-        }));
+        applyWorldEnemies(msg.enemies);
       }
     }
 
@@ -1443,7 +1482,14 @@ function draw() {
 
   drawWorldBackground();
 
+  const viewLeft = state.camera.x - canvas.width * 0.5 - ENEMY_CULL_MARGIN;
+  const viewRight = state.camera.x + canvas.width * 0.5 + ENEMY_CULL_MARGIN;
+  const viewTop = state.camera.y - canvas.height * 0.5 - ENEMY_CULL_MARGIN;
+  const viewBottom = state.camera.y + canvas.height * 0.5 + ENEMY_CULL_MARGIN;
   for (const enemy of state.enemies) {
+    if (enemy.x < viewLeft || enemy.x > viewRight || enemy.y < viewTop || enemy.y > viewBottom) {
+      continue;
+    }
     drawEnemy(enemy);
   }
   for (const peer of state.remotePlayers.values()) {
@@ -1498,6 +1544,7 @@ function reset() {
   state.mouseScreen.y = canvas.height * 0.5;
   updateMouseWorld();
   state.enemies = [];
+  state.enemyById.clear();
   state.deathParticles = [];
   state.blinkEffects = [];
   state.elapsed = 0;
