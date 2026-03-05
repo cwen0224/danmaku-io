@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305145111";
+const APP_VERSION = "20260305145307";
 
 const WEAPON_PRESETS = [
   {
@@ -61,8 +61,8 @@ const ATTACK_MODES = [
     arcMult: 1.0,
     cooldownMult: 1.12,
     damageMult: 1.12,
-    knockbackMult: 1.0,
-    impulseMult: 1.0
+    knockbackMult: 1.85,
+    impulseMult: 3.2
   },
   {
     id: "thrust",
@@ -1068,6 +1068,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
