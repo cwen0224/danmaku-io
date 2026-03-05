@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305144847";
+const APP_VERSION = "20260305145111";
 
 const WEAPON_PRESETS = [
   {
@@ -267,6 +267,24 @@ function updateCamera(dt) {
   updateMouseWorld();
 }
 
+function getNearestEnemyAngle(origin) {
+  let nearest = null;
+  let nearestDistSq = Infinity;
+  for (const enemy of state.enemies) {
+    const dx = enemy.x - origin.x;
+    const dy = enemy.y - origin.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < nearestDistSq) {
+      nearestDistSq = d2;
+      nearest = enemy;
+    }
+  }
+  if (!nearest) {
+    return angleTo(origin, state.mouse);
+  }
+  return angleTo(origin, nearest);
+}
+
 function cycleWeapon() {
   state.weaponIndex = (state.weaponIndex + 1) % WEAPON_PRESETS.length;
   Object.assign(CONFIG.weapon, WEAPON_PRESETS[state.weaponIndex]);
@@ -484,7 +502,7 @@ function calculateHitEffect(enemy, hitRatio) {
 function startSlash() {
   const player = state.player;
   const runtime = state.weaponRuntime;
-  const facing = angleTo(player, state.mouse);
+  const facing = getNearestEnemyAngle(player);
   const direction = state.slashDirection;
   const halfArc = runtime.arc * 0.5;
 
@@ -633,7 +651,7 @@ function update(dt) {
 
   player.x = clamp(player.x, CONFIG.player.radius, CONFIG.world.width - CONFIG.player.radius);
   player.y = clamp(player.y, CONFIG.player.radius, CONFIG.world.height - CONFIG.player.radius);
-  player.facing = angleTo(player, state.mouse);
+  player.facing = getNearestEnemyAngle(player);
   updateCamera(dt);
 
   const spawnInterval = Math.max(
@@ -1050,6 +1068,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
