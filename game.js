@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305142448";
+const APP_VERSION = "20260305143051";
 
 const WEAPON_PRESETS = [
   {
@@ -110,7 +110,7 @@ const CONFIG = {
     edgePadding: 30,
     knockbackDrag: 8.5,
     stunSlowRatio: 0.18,
-    weaponArc: Math.PI * 0.42,
+    weaponArc: Math.PI * 0.22,
     weaponSwingSec: 0.34,
     weaponCooldownSec: 1.3,
     weaponDamage: 4
@@ -572,13 +572,11 @@ function updateActiveSlash(dt) {
 }
 
 function startEnemyAttack(enemy, targetAngle) {
-  const halfArc = CONFIG.enemy.weaponArc * 0.5;
   enemy.attackState = {
     progress: 0,
     centerAngle: targetAngle,
-    startAngle: targetAngle - halfArc,
-    endAngle: targetAngle + halfArc,
-    currentAngle: targetAngle - halfArc,
+    currentAngle: targetAngle,
+    reachScale: 0.62,
     hitApplied: false
   };
 }
@@ -589,12 +587,14 @@ function tryEnemyWeaponHit(enemy) {
   }
 
   const player = state.player;
+  const attack = enemy.attackState;
   const toPlayer = dist(enemy, player);
-  if (toPlayer > enemy.weaponRange + CONFIG.player.radius) {
+  const effectiveRange = enemy.weaponRange * attack.reachScale;
+  if (toPlayer > effectiveRange + CONFIG.player.radius) {
     return;
   }
 
-  const diff = Math.abs(angleDiff(angleTo(enemy, player), enemy.attackState.currentAngle));
+  const diff = Math.abs(angleDiff(angleTo(enemy, player), attack.currentAngle));
   if (diff > CONFIG.enemy.weaponArc * 0.5) {
     return;
   }
@@ -679,18 +679,18 @@ function update(dt) {
     enemy.y += Math.sin(ang) * enemy.speed * chaseScale * dt;
 
     if (enemy.attackState) {
-      enemy.attackState.progress = clamp(
-        enemy.attackState.progress + dt / enemy.weaponSwingSec,
-        0,
-        1
-      );
-      enemy.attackState.currentAngle = lerp(
-        enemy.attackState.startAngle,
-        enemy.attackState.endAngle,
-        enemy.attackState.progress
-      );
+      const attack = enemy.attackState;
+      attack.progress = clamp(attack.progress + dt / enemy.weaponSwingSec, 0, 1);
+      attack.currentAngle = attack.centerAngle;
+      if (attack.progress < 0.28) {
+        attack.reachScale = 0.62 + (attack.progress / 0.28) * 0.78;
+      } else if (attack.progress < 0.58) {
+        attack.reachScale = 1.4;
+      } else {
+        attack.reachScale = 1.4 - ((attack.progress - 0.58) / 0.42) * 0.58;
+      }
       tryEnemyWeaponHit(enemy);
-      if (enemy.attackState.progress >= 1) {
+      if (attack.progress >= 1) {
         enemy.attackState = null;
         enemy.attackTimer = 0;
       }
@@ -822,7 +822,8 @@ function drawWeaponHitbox() {
 
 function drawEnemy(enemy) {
   const weaponAngle = enemy.attackState ? enemy.attackState.currentAngle : enemy.facing;
-  const weaponLength = enemy.weaponRange;
+  const reachScale = enemy.attackState ? enemy.attackState.reachScale : 0.62;
+  const weaponLength = enemy.weaponRange * reachScale;
   const handleLength = weaponLength * 0.66;
   const tipX = enemy.x + Math.cos(weaponAngle) * weaponLength;
   const tipY = enemy.y + Math.sin(weaponAngle) * weaponLength;
@@ -830,16 +831,13 @@ function drawEnemy(enemy) {
   const midY = enemy.y + Math.sin(weaponAngle) * handleLength;
 
   if (enemy.attackState) {
+    const trailX = enemy.x + Math.cos(weaponAngle) * enemy.weaponRange * 1.35;
+    const trailY = enemy.y + Math.sin(weaponAngle) * enemy.weaponRange * 1.35;
     ctx.beginPath();
-    ctx.arc(
-      enemy.x,
-      enemy.y,
-      weaponLength * 0.75,
-      enemy.attackState.startAngle,
-      enemy.attackState.currentAngle
-    );
-    ctx.strokeStyle = "rgba(255, 120, 120, 0.24)";
-    ctx.lineWidth = 5;
+    ctx.moveTo(enemy.x, enemy.y);
+    ctx.lineTo(trailX, trailY);
+    ctx.strokeStyle = "rgba(255, 120, 120, 0.22)";
+    ctx.lineWidth = 6;
     ctx.lineCap = "round";
     ctx.stroke();
   }
@@ -1047,3 +1045,4 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
