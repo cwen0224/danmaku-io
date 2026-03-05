@@ -43,6 +43,21 @@ const WEAPON_PRESETS = [
     baseStunSec: 0.08
   },
   {
+    name: "匕首",
+    length: 3.4,
+    weight: 2.2,
+    center: 4.2,
+    headSharpness: 9.6,
+    shaftSharpness: 4.2,
+    baseDamage: 12,
+    baseKnockback: 54,
+    baseCooldown: 0.13,
+    bleedChanceBase: 0.2,
+    bleedDpsBase: 8.5,
+    bleedDuration: 2.1,
+    baseStunSec: 0.04
+  },
+  {
     name: "戰槌",
     length: 6.3,
     weight: 9.3,
@@ -242,10 +257,13 @@ function deriveWeaponRuntime() {
   const range = (54 + weapon.length * 9) * mode.rangeMult;
   const computedArc = (CONFIG.slash.baseArc + (weapon.length - 5.5) * 0.02) * mode.arcMult;
   const arc = clamp(mode.arcOverride ?? computedArc, Math.PI * 0.18, Math.PI * 2);
+  const weightSlow = 1 + (weapon.weight - 5) * 0.06;
+  const lengthSlow = 1 + (weapon.length - 6) * 0.03;
+  const centerSpeed = 1 - (weapon.center - 5.5) * 0.03;
   const cooldown = clamp(
-    weapon.baseCooldown * (1 - (weapon.center - 5.5) * 0.03) * mode.cooldownMult,
-    0.14,
-    0.7
+    weapon.baseCooldown * weightSlow * lengthSlow * centerSpeed * mode.cooldownMult,
+    0.08,
+    0.95
   );
   const damageWeightMult = 1 + weapon.weight / 20;
   const damageCenterMult = 1 + (weapon.center - 5.5) / 15;
@@ -764,7 +782,7 @@ function updateHud() {
   hpEl.textContent = String(Math.max(0, Math.ceil(state.player.hp)));
   killsEl.textContent = String(state.kills);
   timeEl.textContent = state.elapsed.toFixed(1);
-  weaponEl.textContent = `${CONFIG.weapon.name} (${Math.round(state.weaponRuntime.moveMultiplier * 100)}%速)`;
+  weaponEl.textContent = `${CONFIG.weapon.name} (${Math.round(state.weaponRuntime.moveMultiplier * 100)}%移速 / ${state.weaponRuntime.cooldown.toFixed(2)}s攻速)`;
   slashModeEl.textContent = `${mode.name} / ${state.lastHitLabel}`;
 }
 
