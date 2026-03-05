@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305150536";
+const APP_VERSION = "20260305150809";
 
 const WEAPON_PRESETS = [
   {
@@ -61,18 +61,18 @@ const ATTACK_MODES = [
     arcMult: 1.0,
     cooldownMult: 1.12,
     damageMult: 1.12,
-    knockbackMult: 1.85,
-    impulseMult: 3.2
+    knockbackMult: 9,
+    impulseMult: 9
   },
   {
     id: "thrust",
     name: "突刺",
-    rangeMult: 1.26,
+    rangeMult: 1.0,
     arcMult: 0.36,
     cooldownMult: 0.62,
     damageMult: 1.34,
-    knockbackMult: 2.6,
-    impulseMult: 5.5
+    knockbackMult: 16,
+    impulseMult: 16
   },
   {
     id: "breaker",
@@ -82,8 +82,8 @@ const ATTACK_MODES = [
     arcMult: 1.42,
     cooldownMult: 1.9,
     damageMult: 0.78,
-    knockbackMult: 1.08,
-    impulseMult: 1.2
+    knockbackMult: 4,
+    impulseMult: 4
   }
 ];
 
@@ -1179,6 +1179,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
