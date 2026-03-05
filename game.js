@@ -464,7 +464,7 @@ function applySlashHitbox(slashAngle, hitEnemyIds) {
   const slashProgress = state.activeSlash ? state.activeSlash.progress : 1;
   const thrustBurst =
     mode.id === "thrust"
-      ? (2.2 + Math.sin(slashProgress * Math.PI) * 1.3) * 10
+      ? (2.2 + Math.sin(slashProgress * Math.PI) * 1.3) * 2
       : 1;
   const tip = {
     x: player.x + Math.cos(slashAngle) * runtime.range,
