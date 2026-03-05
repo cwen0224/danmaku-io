@@ -454,12 +454,12 @@ function calculateHitEffect(enemy, hitRatio) {
   if (sharpness >= 7) {
     const sharpBonus = 1 + (sharpness - 7) * 0.14;
     damage *= sharpBonus;
-    knockback *= 0.55;
+    knockback *= 1.1;
     applyBleed(enemy, sharpness, runtime);
     hitLabel = "利刃";
   } else if (sharpness <= 3) {
     const bluntEnergy = 1 + (3 - sharpness) * 0.16;
-    knockback *= 1.5 * bluntEnergy;
+    knockback *= 0.5 * bluntEnergy;
     applyStun(enemy, runtime);
     hitLabel = "鈍擊";
   } else {
