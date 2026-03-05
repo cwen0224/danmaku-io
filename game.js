@@ -137,7 +137,11 @@ const CONFIG = {
     accelPerMin: 0.24,
     edgePadding: 30,
     knockbackDrag: 8.5,
-    stunSlowRatio: 0.18
+    stunSlowRatio: 0.18,
+    weaponArc: Math.PI * 0.42,
+    weaponSwingSec: 0.34,
+    weaponCooldownSec: 1.3,
+    weaponDamage: 4
   },
   world: {
     width: 4200,
@@ -400,6 +404,10 @@ function spawnEnemy() {
   }
 
   const speed = speedBase * intensity;
+  const weaponRange = radius * 1.85 + 16;
+  const weaponCooldown = CONFIG.enemy.weaponCooldownSec + sizeFactor * 0.4;
+  const weaponDamage = CONFIG.enemy.weaponDamage + sizeFactor * 2.6;
+  const weaponSwingSec = CONFIG.enemy.weaponSwingSec + sizeFactor * 0.06;
 
   state.enemies.push({
     x,
@@ -409,6 +417,13 @@ function spawnEnemy() {
     radius,
     speed,
     sizeFactor,
+    facing: Math.random() * Math.PI * 2,
+    weaponRange,
+    weaponCooldown,
+    weaponDamage,
+    weaponSwingSec,
+    attackTimer: Math.random() * weaponCooldown,
+    attackState: null,
     hp: hpBase,
     hitFlash: 0,
     status: {
@@ -576,6 +591,41 @@ function updateActiveSlash(dt) {
   }
 }
 
+function startEnemyAttack(enemy, targetAngle) {
+  const halfArc = CONFIG.enemy.weaponArc * 0.5;
+  enemy.attackState = {
+    progress: 0,
+    centerAngle: targetAngle,
+    startAngle: targetAngle - halfArc,
+    endAngle: targetAngle + halfArc,
+    currentAngle: targetAngle - halfArc,
+    hitApplied: false
+  };
+}
+
+function tryEnemyWeaponHit(enemy) {
+  if (!enemy.attackState || enemy.attackState.hitApplied) {
+    return;
+  }
+
+  const player = state.player;
+  const toPlayer = dist(enemy, player);
+  if (toPlayer > enemy.weaponRange + CONFIG.player.radius) {
+    return;
+  }
+
+  const diff = Math.abs(angleDiff(angleTo(enemy, player), enemy.attackState.currentAngle));
+  if (diff > CONFIG.enemy.weaponArc * 0.5) {
+    return;
+  }
+
+  if (player.invincible <= 0) {
+    player.hp -= enemy.weaponDamage;
+    player.invincible = CONFIG.player.invincibleSec;
+  }
+  enemy.attackState.hitApplied = true;
+}
+
 function update(dt) {
   if (!state.running) {
     return;
@@ -643,14 +693,34 @@ function update(dt) {
     enemy.y += enemy.vy * dt;
 
     const ang = angleTo(enemy, player);
+    enemy.facing = lerp(enemy.facing, ang, 0.14);
     const chaseScale = enemy.status.stunSec > 0 ? CONFIG.enemy.stunSlowRatio : 1;
     enemy.x += Math.cos(ang) * enemy.speed * chaseScale * dt;
     enemy.y += Math.sin(ang) * enemy.speed * chaseScale * dt;
 
-    if (dist(enemy, player) <= enemy.radius + CONFIG.player.radius) {
-      if (player.invincible <= 0) {
-        player.hp -= CONFIG.player.contactDamage;
-        player.invincible = CONFIG.player.invincibleSec;
+    if (enemy.attackState) {
+      enemy.attackState.progress = clamp(
+        enemy.attackState.progress + dt / enemy.weaponSwingSec,
+        0,
+        1
+      );
+      enemy.attackState.currentAngle = lerp(
+        enemy.attackState.startAngle,
+        enemy.attackState.endAngle,
+        enemy.attackState.progress
+      );
+      tryEnemyWeaponHit(enemy);
+      if (enemy.attackState.progress >= 1) {
+        enemy.attackState = null;
+        enemy.attackTimer = 0;
+      }
+    } else if (enemy.status.stunSec <= 0) {
+      enemy.attackTimer += dt;
+      if (
+        enemy.attackTimer >= enemy.weaponCooldown &&
+        dist(enemy, player) <= enemy.weaponRange + CONFIG.player.radius + 6
+      ) {
+        startEnemyAttack(enemy, enemy.facing);
       }
     }
   }
@@ -771,6 +841,45 @@ function drawWeaponHitbox() {
 }
 
 function drawEnemy(enemy) {
+  const weaponAngle = enemy.attackState ? enemy.attackState.currentAngle : enemy.facing;
+  const weaponLength = enemy.weaponRange;
+  const handleLength = weaponLength * 0.66;
+  const tipX = enemy.x + Math.cos(weaponAngle) * weaponLength;
+  const tipY = enemy.y + Math.sin(weaponAngle) * weaponLength;
+  const midX = enemy.x + Math.cos(weaponAngle) * handleLength;
+  const midY = enemy.y + Math.sin(weaponAngle) * handleLength;
+
+  if (enemy.attackState) {
+    ctx.beginPath();
+    ctx.arc(
+      enemy.x,
+      enemy.y,
+      weaponLength * 0.75,
+      enemy.attackState.startAngle,
+      enemy.attackState.currentAngle
+    );
+    ctx.strokeStyle = "rgba(255, 120, 120, 0.24)";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(enemy.x, enemy.y);
+  ctx.lineTo(midX, midY);
+  ctx.strokeStyle = "rgba(132, 94, 74, 0.88)";
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(midX, midY);
+  ctx.lineTo(tipX, tipY);
+  ctx.strokeStyle = "rgba(218, 238, 250, 0.92)";
+  ctx.lineWidth = 3.1;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
   ctx.beginPath();
   ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
 
