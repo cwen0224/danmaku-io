@@ -601,15 +601,26 @@ function drawWeaponHitbox() {
   const angle = slash
     ? (isThrustMode ? slash.centerAngle : slash.currentAngle)
     : player.facing;
-  const thrustPunch = slash && isThrustMode ? Math.sin(slash.progress * Math.PI) : 0;
-  const thrustOffset = runtime.range * 0.32 * thrustPunch;
-  const anchorX = player.x + Math.cos(angle) * thrustOffset;
-  const anchorY = player.y + Math.sin(angle) * thrustOffset;
-  const headStartDistance = runtime.range * CONFIG.slash.headHitThreshold;
+  let reachScale = 1;
+  if (slash && isThrustMode) {
+    const p = slash.progress;
+    if (p < 0.24) {
+      reachScale = 0.58 + (p / 0.24) * 0.88;
+    } else if (p < 0.56) {
+      reachScale = 1.46;
+    } else {
+      reachScale = 1.46 - ((p - 0.56) / 0.44) * 0.56;
+    }
+  }
+
+  const anchorX = player.x;
+  const anchorY = player.y;
+  const headStartDistance = runtime.range * CONFIG.slash.headHitThreshold * reachScale;
+  const tipDistance = runtime.range * reachScale;
   const headStartX = anchorX + Math.cos(angle) * headStartDistance;
   const headStartY = anchorY + Math.sin(angle) * headStartDistance;
-  const tipX = anchorX + Math.cos(angle) * runtime.range;
-  const tipY = anchorY + Math.sin(angle) * runtime.range;
+  const tipX = anchorX + Math.cos(angle) * tipDistance;
+  const tipY = anchorY + Math.sin(angle) * tipDistance;
   const coreWidth = slash ? CONFIG.slash.hitboxRadius * 1.9 : 7 + idleReady * 4;
   const shaftColor = slash ? "rgba(209, 168, 112, 0.96)" : "rgba(170, 132, 82, 0.8)";
   const bladeColor = slash ? "rgba(225, 248, 255, 0.98)" : "rgba(166, 205, 220, 0.9)";
@@ -631,8 +642,8 @@ function drawWeaponHitbox() {
   }
 
   if (slash && isThrustMode) {
-    const trailTipX = player.x + Math.cos(angle) * runtime.range;
-    const trailTipY = player.y + Math.sin(angle) * runtime.range;
+    const trailTipX = player.x + Math.cos(angle) * runtime.range * 1.52;
+    const trailTipY = player.y + Math.sin(angle) * runtime.range * 1.52;
     ctx.beginPath();
     ctx.moveTo(player.x, player.y);
     ctx.lineTo(trailTipX, trailTipY);
