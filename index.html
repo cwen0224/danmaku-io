@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>彈幕IO</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -27,6 +30,24 @@
     </section>
   </main>
 
-  <script src="game.js?v=20260305141520"></script>
+  <script>
+    (function loadGameWithVersion() {
+      const fallbackVersion = "20260305142448";
+      const vUrl = `version.json?ts=${Date.now()}`;
+      fetch(vUrl, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("version fetch failed"))))
+        .then((data) => {
+          const version = data && data.version ? String(data.version) : fallbackVersion;
+          const script = document.createElement("script");
+          script.src = `game.js?v=${encodeURIComponent(version)}`;
+          document.body.appendChild(script);
+        })
+        .catch(() => {
+          const script = document.createElement("script");
+          script.src = `game.js?v=${fallbackVersion}`;
+          document.body.appendChild(script);
+        });
+    })();
+  </script>
 </body>
 </html>
