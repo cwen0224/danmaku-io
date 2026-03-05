@@ -12,7 +12,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305161944";
+const APP_VERSION = "20260305162110";
 
 const WEAPON_PRESETS = [
   {
@@ -885,7 +885,7 @@ function startSlash() {
   sendAttackEvent(state.activeSlash, mode, runtime);
 }
 
-function applySlashHitbox(slashAngle, hitEnemyIds) {
+function applySlashHitbox(slashAngle, hitEnemyIds, previewOnly = false) {
   const player = state.player;
   const runtime = state.weaponRuntime;
   const mode = ATTACK_MODES[state.attackModeIndex];
@@ -912,7 +912,9 @@ function applySlashHitbox(slashAngle, hitEnemyIds) {
     }
 
     const effect = calculateHitEffect(enemy, segment.t);
-    enemy.hp -= effect.damage;
+    if (!previewOnly) {
+      enemy.hp -= effect.damage;
+    }
     enemy.hitFlash = 0.08;
     const dx = enemy.x - player.x;
     const dy = enemy.y - player.y;
@@ -920,17 +922,30 @@ function applySlashHitbox(slashAngle, hitEnemyIds) {
     const pushX = len > 0.001 ? dx / len : Math.cos(slashAngle);
     const pushY = len > 0.001 ? dy / len : Math.sin(slashAngle);
 
-    enemy.x += pushX * effect.knockback * CONFIG.slash.visualKnockbackScale * thrustBurst;
-    enemy.y += pushY * effect.knockback * CONFIG.slash.visualKnockbackScale * thrustBurst;
-    enemy.vx += pushX * effect.knockback * CONFIG.slash.knockbackImpulseScale * runtime.impulseModeMult * thrustBurst;
-    enemy.vy += pushY * effect.knockback * CONFIG.slash.knockbackImpulseScale * runtime.impulseModeMult * thrustBurst;
+    const previewScale = previewOnly ? 0.55 : 1;
+    enemy.x += pushX * effect.knockback * CONFIG.slash.visualKnockbackScale * thrustBurst * previewScale;
+    enemy.y += pushY * effect.knockback * CONFIG.slash.visualKnockbackScale * thrustBurst * previewScale;
+    enemy.vx +=
+      pushX *
+      effect.knockback *
+      CONFIG.slash.knockbackImpulseScale *
+      runtime.impulseModeMult *
+      thrustBurst *
+      previewScale;
+    enemy.vy +=
+      pushY *
+      effect.knockback *
+      CONFIG.slash.knockbackImpulseScale *
+      runtime.impulseModeMult *
+      thrustBurst *
+      previewScale;
 
     state.lastHitLabel = effect.hitLabel;
     hitEnemyIds.add(enemy);
   }
 }
 
-function updateActiveSlash(dt, applyHits = true) {
+function updateActiveSlash(dt, applyHits = true, previewOnly = false) {
   if (!state.activeSlash) {
     return;
   }
@@ -941,7 +956,7 @@ function updateActiveSlash(dt, applyHits = true) {
   slash.progress = nextProgress;
   slash.currentAngle = lerp(slash.startAngle, slash.endAngle, slash.progress);
   if (applyHits) {
-    applySlashHitbox(slash.currentAngle, slash.hitEnemyIds);
+    applySlashHitbox(slash.currentAngle, slash.hitEnemyIds, previewOnly);
   }
 
   if (slash.progress >= 1) {
@@ -1030,7 +1045,7 @@ function update(dt) {
     startSlash();
   }
 
-  updateActiveSlash(dt, !state.network.enabled);
+  updateActiveSlash(dt, true, state.network.enabled);
 
   if (!state.network.enabled) {
     for (const enemy of state.enemies) {
