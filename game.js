@@ -86,7 +86,7 @@ const ATTACK_MODES = [
     arcOverride: (Math.PI * 2) / 3,
     arcMult: 1.0,
     cooldownMult: 1.12,
-    damageMult: 1.0,
+    damageMult: 1.12,
     knockbackMult: 1.0,
     impulseMult: 1.0
   },
@@ -96,7 +96,7 @@ const ATTACK_MODES = [
     rangeMult: 1.26,
     arcMult: 0.36,
     cooldownMult: 0.62,
-    damageMult: 1.12,
+    damageMult: 1.34,
     knockbackMult: 1.35,
     impulseMult: 2.1
   },
@@ -107,7 +107,7 @@ const ATTACK_MODES = [
     arcOverride: Math.PI * 2,
     arcMult: 1.42,
     cooldownMult: 1.9,
-    damageMult: 1.26,
+    damageMult: 0.78,
     knockbackMult: 1.5,
     impulseMult: 1.75
   }
