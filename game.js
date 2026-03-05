@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305143051";
+const APP_VERSION = "20260305143307";
 
 const WEAPON_PRESETS = [
   {
@@ -113,7 +113,8 @@ const CONFIG = {
     weaponArc: Math.PI * 0.22,
     weaponSwingSec: 0.34,
     weaponCooldownSec: 1.3,
-    weaponDamage: 4
+    weaponDamage: 4,
+    turnLerpPerSec: 2.2
   },
   world: {
     width: 4200,
@@ -673,7 +674,8 @@ function update(dt) {
     enemy.y += enemy.vy * dt;
 
     const ang = angleTo(enemy, player);
-    enemy.facing = lerp(enemy.facing, ang, 0.14);
+    const turnT = 1 - Math.exp(-CONFIG.enemy.turnLerpPerSec * dt);
+    enemy.facing = lerp(enemy.facing, ang, turnT);
     const chaseScale = enemy.status.stunSec > 0 ? CONFIG.enemy.stunSlowRatio : 1;
     enemy.x += Math.cos(ang) * enemy.speed * chaseScale * dt;
     enemy.y += Math.sin(ang) * enemy.speed * chaseScale * dt;
@@ -1045,4 +1047,5 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
