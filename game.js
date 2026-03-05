@@ -97,8 +97,8 @@ const ATTACK_MODES = [
     arcMult: 0.36,
     cooldownMult: 0.62,
     damageMult: 1.34,
-    knockbackMult: 1.35,
-    impulseMult: 2.1
+    knockbackMult: 2.6,
+    impulseMult: 5.5
   },
   {
     id: "breaker",
@@ -108,8 +108,8 @@ const ATTACK_MODES = [
     arcMult: 1.42,
     cooldownMult: 1.9,
     damageMult: 0.78,
-    knockbackMult: 1.5,
-    impulseMult: 1.75
+    knockbackMult: 1.08,
+    impulseMult: 1.2
   }
 ];
 
@@ -460,6 +460,12 @@ function startSlash() {
 function applySlashHitbox(slashAngle, hitEnemyIds) {
   const player = state.player;
   const runtime = state.weaponRuntime;
+  const mode = ATTACK_MODES[state.attackModeIndex];
+  const slashProgress = state.activeSlash ? state.activeSlash.progress : 1;
+  const thrustBurst =
+    mode.id === "thrust"
+      ? 2.2 + Math.sin(slashProgress * Math.PI) * 1.3
+      : 1;
   const tip = {
     x: player.x + Math.cos(slashAngle) * runtime.range,
     y: player.y + Math.sin(slashAngle) * runtime.range
@@ -486,10 +492,10 @@ function applySlashHitbox(slashAngle, hitEnemyIds) {
     const pushX = len > 0.001 ? dx / len : Math.cos(slashAngle);
     const pushY = len > 0.001 ? dy / len : Math.sin(slashAngle);
 
-    enemy.x += pushX * effect.knockback * CONFIG.slash.visualKnockbackScale;
-    enemy.y += pushY * effect.knockback * CONFIG.slash.visualKnockbackScale;
-    enemy.vx += pushX * effect.knockback * CONFIG.slash.knockbackImpulseScale * runtime.impulseModeMult;
-    enemy.vy += pushY * effect.knockback * CONFIG.slash.knockbackImpulseScale * runtime.impulseModeMult;
+    enemy.x += pushX * effect.knockback * CONFIG.slash.visualKnockbackScale * thrustBurst;
+    enemy.y += pushY * effect.knockback * CONFIG.slash.visualKnockbackScale * thrustBurst;
+    enemy.vx += pushX * effect.knockback * CONFIG.slash.knockbackImpulseScale * runtime.impulseModeMult * thrustBurst;
+    enemy.vy += pushY * effect.knockback * CONFIG.slash.knockbackImpulseScale * runtime.impulseModeMult * thrustBurst;
 
     state.lastHitLabel = effect.hitLabel;
     hitEnemyIds.add(enemy);
