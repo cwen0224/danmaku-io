@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305150349";
+const APP_VERSION = "20260305150536";
 
 const WEAPON_PRESETS = [
   {
@@ -71,8 +71,8 @@ const ATTACK_MODES = [
     arcMult: 0.36,
     cooldownMult: 0.62,
     damageMult: 1.34,
-    knockbackMult: 1.3,
-    impulseMult: 2.75
+    knockbackMult: 2.6,
+    impulseMult: 5.5
   },
   {
     id: "breaker",
@@ -1179,6 +1179,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
