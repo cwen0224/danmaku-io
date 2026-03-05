@@ -22,7 +22,9 @@ const CONFIG = {
   slash: {
     baseArc: Math.PI * 0.5,
     headHitThreshold: 0.68,
-    visualKnockbackScale: 0.065
+    visualKnockbackScale: 0.065,
+    hitboxRadius: 16,
+    swingDurationSec: 0.12
   },
   enemy: {
     spawnSec: 0.72,
@@ -58,7 +60,9 @@ const state = {
   running: true,
   lastTs: 0,
   weaponRuntime: null,
-  lastHitLabel: "待命"
+  lastHitLabel: "待命",
+  slashDirection: 1,
+  activeSlash: null
 };
 
 function clamp(value, min, max) {
@@ -75,6 +79,29 @@ function angleTo(from, to) {
 
 function angleDiff(a, b) {
   return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function pointSegmentInfo(point, a, b) {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const apx = point.x - a.x;
+  const apy = point.y - a.y;
+  const abLenSq = abx * abx + aby * aby || 1;
+  const rawT = (apx * abx + apy * aby) / abLenSq;
+  const t = clamp(rawT, 0, 1);
+  const closestX = a.x + abx * t;
+  const closestY = a.y + aby * t;
+  const dx = point.x - closestX;
+  const dy = point.y - closestY;
+
+  return {
+    t,
+    distance: Math.hypot(dx, dy)
+  };
 }
 
 function deriveWeaponRuntime() {
@@ -240,34 +267,78 @@ function calculateHitEffect(enemy, hitRatio) {
   };
 }
 
-function applySlash() {
+function startSlash() {
   const player = state.player;
   const runtime = state.weaponRuntime;
   const facing = angleTo(player, state.mouse);
-  player.facing = facing;
+  const direction = state.slashDirection;
+  const halfArc = runtime.arc * 0.5;
+
+  const startAngle = facing - halfArc * direction;
+  const endAngle = facing + halfArc * direction;
+
+  state.activeSlash = {
+    progress: 0,
+    direction,
+    startAngle,
+    endAngle,
+    currentAngle: startAngle,
+    hitEnemyIds: new Set()
+  };
+
+  state.slashDirection *= -1;
   state.lastHitLabel = "揮空";
+}
+
+function applySlashHitbox(slashAngle, hitEnemyIds) {
+  const player = state.player;
+  const runtime = state.weaponRuntime;
+  const tip = {
+    x: player.x + Math.cos(slashAngle) * runtime.range,
+    y: player.y + Math.sin(slashAngle) * runtime.range
+  };
 
   for (const enemy of state.enemies) {
-    const distance = dist(player, enemy);
-    if (distance > runtime.range + enemy.radius) {
+    if (hitEnemyIds.has(enemy)) {
       continue;
     }
 
-    const enemyAngle = angleTo(player, enemy);
-    const diff = Math.abs(angleDiff(enemyAngle, facing));
-    if (diff > runtime.arc * 0.5) {
+    const segment = pointSegmentInfo(enemy, player, tip);
+    const hitRadius = enemy.radius + CONFIG.slash.hitboxRadius;
+
+    if (segment.distance > hitRadius) {
       continue;
     }
 
-    const hitRatio = clamp((distance - CONFIG.player.radius) / runtime.range, 0, 1);
-    const effect = calculateHitEffect(enemy, hitRatio);
-
+    const effect = calculateHitEffect(enemy, segment.t);
     enemy.hp -= effect.damage;
     enemy.hitFlash = 0.08;
-    enemy.x += Math.cos(enemyAngle) * effect.knockback * CONFIG.slash.visualKnockbackScale;
-    enemy.y += Math.sin(enemyAngle) * effect.knockback * CONFIG.slash.visualKnockbackScale;
+
+    const pushAngle = angleTo(player, enemy);
+    enemy.x += Math.cos(pushAngle) * effect.knockback * CONFIG.slash.visualKnockbackScale;
+    enemy.y += Math.sin(pushAngle) * effect.knockback * CONFIG.slash.visualKnockbackScale;
 
     state.lastHitLabel = effect.hitLabel;
+    hitEnemyIds.add(enemy);
+  }
+}
+
+function updateActiveSlash(dt) {
+  if (!state.activeSlash) {
+    return;
+  }
+
+  const runtime = state.weaponRuntime;
+  const duration = Math.min(CONFIG.slash.swingDurationSec, runtime.cooldown * 0.6);
+  const slash = state.activeSlash;
+  const nextProgress = clamp(slash.progress + dt / duration, 0, 1);
+
+  slash.progress = nextProgress;
+  slash.currentAngle = lerp(slash.startAngle, slash.endAngle, slash.progress);
+  applySlashHitbox(slash.currentAngle, slash.hitEnemyIds);
+
+  if (slash.progress >= 1) {
+    state.activeSlash = null;
   }
 }
 
@@ -308,10 +379,12 @@ function update(dt) {
     spawnEnemy();
   }
 
-  while (state.slashTimer >= runtime.cooldown) {
+  if (!state.activeSlash && state.slashTimer >= runtime.cooldown) {
     state.slashTimer -= runtime.cooldown;
-    applySlash();
+    startSlash();
   }
+
+  updateActiveSlash(dt);
 
   for (const enemy of state.enemies) {
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
@@ -361,23 +434,43 @@ function update(dt) {
   updateHud();
 }
 
-function drawSlashPreview() {
+function drawWeaponHitbox() {
   const player = state.player;
   const runtime = state.weaponRuntime;
-  const ready = clamp(state.slashTimer / runtime.cooldown, 0, 1);
-  const alpha = 0.14 + 0.22 * ready;
+  const slash = state.activeSlash;
+  const idleReady = clamp(state.slashTimer / runtime.cooldown, 0, 1);
+  const angle = slash ? slash.currentAngle : player.facing;
+  const tipX = player.x + Math.cos(angle) * runtime.range;
+  const tipY = player.y + Math.sin(angle) * runtime.range;
+  const coreWidth = slash ? CONFIG.slash.hitboxRadius * 1.9 : 7 + idleReady * 4;
+
+  if (slash) {
+    ctx.beginPath();
+    ctx.arc(
+      player.x,
+      player.y,
+      runtime.range * 0.74,
+      slash.startAngle,
+      slash.currentAngle,
+      slash.direction < 0
+    );
+    ctx.strokeStyle = "rgba(57, 217, 138, 0.25)";
+    ctx.lineWidth = CONFIG.slash.hitboxRadius * 1.2;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
 
   ctx.beginPath();
   ctx.moveTo(player.x, player.y);
-  ctx.arc(
-    player.x,
-    player.y,
-    runtime.range,
-    player.facing - runtime.arc * 0.5,
-    player.facing + runtime.arc * 0.5
-  );
-  ctx.closePath();
-  ctx.fillStyle = `rgba(57, 217, 138, ${alpha.toFixed(3)})`;
+  ctx.lineTo(tipX, tipY);
+  ctx.strokeStyle = slash ? "rgba(131, 255, 200, 0.95)" : `rgba(57, 217, 138, ${(0.5 + idleReady * 0.3).toFixed(3)})`;
+  ctx.lineWidth = coreWidth;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(tipX, tipY, coreWidth * 0.55, 0, Math.PI * 2);
+  ctx.fillStyle = slash ? "rgba(200, 255, 225, 0.92)" : "rgba(100, 230, 170, 0.7)";
   ctx.fill();
 }
 
@@ -409,24 +502,23 @@ function drawPlayer() {
   ctx.beginPath();
   ctx.moveTo(player.x, player.y);
   ctx.lineTo(
-    player.x + Math.cos(player.facing) * 24,
-    player.y + Math.sin(player.facing) * 24
+    player.x + Math.cos(player.facing) * 18,
+    player.y + Math.sin(player.facing) * 18
   );
-  ctx.strokeStyle = "#39d98a";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(57, 217, 138, 0.7)";
+  ctx.lineWidth = 2;
   ctx.stroke();
 }
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  drawSlashPreview();
-
   for (const enemy of state.enemies) {
     drawEnemy(enemy);
   }
 
   drawPlayer();
+  drawWeaponHitbox();
 }
 
 function updateHud() {
@@ -459,6 +551,8 @@ function reset() {
   state.running = true;
   state.lastTs = performance.now();
   state.lastHitLabel = "待命";
+  state.slashDirection = 1;
+  state.activeSlash = null;
   overlay.classList.add("hidden");
   updateHud();
 }
