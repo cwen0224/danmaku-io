@@ -22,7 +22,7 @@ const CONFIG = {
   slash: {
     baseArc: Math.PI * 0.5,
     headHitThreshold: 0.68,
-    visualKnockbackScale: 0.016
+    visualKnockbackScale: 0.065
   },
   enemy: {
     spawnSec: 0.72,
