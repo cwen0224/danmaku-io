@@ -11,7 +11,7 @@ const overlay = document.getElementById("overlay");
 const restartBtn = document.getElementById("restart");
 const finalTimeEl = document.getElementById("final-time");
 const finalKillsEl = document.getElementById("final-kills");
-const APP_VERSION = "20260305151130";
+const APP_VERSION = "20260305151502";
 
 const WEAPON_PRESETS = [
   {
@@ -68,7 +68,7 @@ const ATTACK_MODES = [
     id: "thrust",
     name: "突刺",
     rangeMult: 1.0,
-    arcMult: 0.36,
+    arcMult: 0.18,
     cooldownMult: 0.62,
     damageMult: 1.34,
     knockbackMult: 4,
@@ -1179,6 +1179,7 @@ if (versionBadgeEl) {
 
 reset();
 requestAnimationFrame(tick);
+
 
 
 
