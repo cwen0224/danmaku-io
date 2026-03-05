@@ -66,7 +66,7 @@ const ATTACK_MODES = [
     rangeMult: 1.0,
     arcOverride: (Math.PI * 2) / 3,
     arcMult: 1.0,
-    cooldownMult: 1.0,
+    cooldownMult: 1.12,
     damageMult: 1.0,
     knockbackMult: 1.0,
     impulseMult: 1.0
@@ -76,7 +76,7 @@ const ATTACK_MODES = [
     name: "突刺",
     rangeMult: 1.26,
     arcMult: 0.36,
-    cooldownMult: 0.78,
+    cooldownMult: 0.62,
     damageMult: 1.12,
     knockbackMult: 0.85,
     impulseMult: 1.05
@@ -87,7 +87,7 @@ const ATTACK_MODES = [
     rangeMult: 0.86,
     arcOverride: Math.PI * 2,
     arcMult: 1.42,
-    cooldownMult: 1.35,
+    cooldownMult: 1.9,
     damageMult: 1.26,
     knockbackMult: 1.5,
     impulseMult: 1.75
