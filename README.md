@@ -25,25 +25,44 @@ index.html?mp=ws://localhost:8080
 ```
 4. 畫面上方 `連線` 會顯示 `已連線(n)`，並看到其他玩家位置與朝向。
 
-## 免費上線（Render + GitHub Pages）
-1. 到 Render 建立 `Web Service`，連接這個 GitHub repo。
-2. Render 設定：
-```text
-Runtime: Node
-Build Command: npm install
-Start Command: npm start
-Plan: Free
+## 部署 Relay 到 Fly.io
+1. 安裝並登入 `flyctl`。
+2. 在專案根目錄執行：
+
+```bash
+fly launch --no-deploy
 ```
-3. 部署完成後，取得 WebSocket 網址（例如 `wss://danmaku-io-relay.onrender.com`）。
-4. 編輯 `index.html`，把這行改成你的 Render 網址：
+
+3. 檢查 [fly.toml](C:\Users\Sang\Desktop\彈幕IO\fly.toml) 的 `app` 名稱是否可用，不可用就改成新的唯一名稱。
+4. 部署：
+
+```bash
+fly deploy
+```
+
+5. 部署完成後，取得網址：
+
+```text
+wss://<你的-fly-app>.fly.dev
+```
+
+6. 編輯 [index.html](C:\Users\Sang\Desktop\彈幕IO\index.html)，把這行改成你的 Fly 網址：
+
 ```html
-window.DANMAKU_WS_URL = "wss://danmaku-io-relay.onrender.com";
+window.DANMAKU_WS_URL = "wss://<你的-fly-app>.fly.dev";
 ```
-5. 提交並推送到 GitHub，Pages 更新後，玩家直接開網頁就會自動連線。
-6. 也可以臨時覆蓋連線位址：
+
+7. 推送到 GitHub，Pages 更新後，玩家直接開網頁就會自動連到 Fly relay。
+8. 也可以先用網址參數測試，不改預設值：
+
 ```text
-https://<你的帳號>.github.io/<repo>/?mp=wss://danmaku-io-relay.onrender.com
+https://<你的帳號>.github.io/<repo>/?mp=wss://<你的-fly-app>.fly.dev
 ```
+
+## Fly 檔案
+- [fly.toml](C:\Users\Sang\Desktop\彈幕IO\fly.toml)：Fly app 設定
+- [Dockerfile](C:\Users\Sang\Desktop\彈幕IO\Dockerfile)：Node relay 容器
+- [.dockerignore](C:\Users\Sang\Desktop\彈幕IO\.dockerignore)：縮小 build context
 
 ## 部署到 GitHub Pages
 
