@@ -1,0 +1,7 @@
+{
+	email {$APP_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	reverse_proxy relay:8080
+}

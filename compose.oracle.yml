@@ -1,0 +1,31 @@
+services:
+  relay:
+    build:
+      context: .
+    container_name: danmaku-io-relay
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2
+    container_name: danmaku-io-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      APP_EMAIL: ${APP_EMAIL}
+    volumes:
+      - ./deploy/oracle/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - relay
+
+volumes:
+  caddy_data:
+  caddy_config:
